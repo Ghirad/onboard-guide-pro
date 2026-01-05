@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Preview from "./pages/Preview";
+import VisualTourBuilder from "./pages/VisualTourBuilder";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Preview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/config/:id/visual-builder"
+              element={
+                <ProtectedRoute>
+                  <VisualTourBuilder />
                 </ProtectedRoute>
               }
             />

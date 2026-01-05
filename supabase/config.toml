@@ -1,1 +1,4 @@
 project_id = "ukjpxeptefznpwduwled"
+
+[functions.proxy-page]
+verify_jwt = false

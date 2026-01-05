@@ -27,7 +27,7 @@ import {
 } from "@/hooks/useConfigurations";
 import { StepEditor } from "@/components/config/StepEditor";
 import { CodeGenerator } from "@/components/config/CodeGenerator";
-import { Loader2, ArrowLeft, Plus, GripVertical, Trash2, ChevronRight, Eye } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, GripVertical, Trash2, ChevronRight, Eye, MousePointer } from "lucide-react";
 import { SetupStep } from "@/types/database";
 import {
   DndContext,
@@ -260,6 +260,12 @@ export default function ConfigEditor() {
                 <Link to={`/config/${id}/preview`}>
                   <Eye className="mr-2 h-4 w-4" />
                   Preview
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to={`/config/${id}/visual-builder`}>
+                  <MousePointer className="mr-2 h-4 w-4" />
+                  Editor Visual
                 </Link>
               </Button>
             </div>
