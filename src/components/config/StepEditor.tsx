@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedUpdate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,20 +134,58 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
   const deleteAction = useDeleteAction();
   const updateAction = useUpdateAction();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Debounced handlers for text fields
+  const handleTitleUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, title: value });
+  }, [step.id, configurationId, updateStep]);
 
-  const handleUpdate = (field: string, value: unknown) => {
+  const handleDescriptionUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, description: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const handleInstructionsUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, instructions: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const handleTipsUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, tips: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const handleTargetUrlUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, target_url: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const handleTargetSelectorUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, target_selector: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const handleImageUrlUpdate = useCallback((value: string) => {
+    updateStep.mutate({ id: step.id, configurationId, image_url: value });
+  }, [step.id, configurationId, updateStep]);
+
+  const [title, setTitle] = useDebouncedValue(step.title, handleTitleUpdate);
+  const [description, setDescription] = useDebouncedValue(step.description || "", handleDescriptionUpdate);
+  const [instructions, setInstructions] = useDebouncedValue(step.instructions || "", handleInstructionsUpdate);
+  const [tips, setTips] = useDebouncedValue(step.tips || "", handleTipsUpdate);
+  const [targetUrl, setTargetUrl] = useDebouncedValue(step.target_url || "", handleTargetUrlUpdate);
+  const [targetSelector, setTargetSelector] = useDebouncedValue(step.target_selector || "", handleTargetSelectorUpdate);
+  const [imageUrl, setImageUrl] = useDebouncedValue(step.image_url || "", handleImageUrlUpdate);
+
+  // Non-debounced update for selects/switches
+  const handleImmediateUpdate = (field: string, value: unknown) => {
     updateStep.mutate({
       id: step.id,
       configurationId,
       [field]: value,
     });
   };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -208,8 +247,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="title">Título</Label>
               <Input
                 id="title"
-                value={step.title}
-                onChange={(e) => handleUpdate("title", e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
               />
             </div>
 
@@ -217,8 +256,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="description">Descrição</Label>
               <Textarea
                 id="description"
-                value={step.description || ""}
-                onChange={(e) => handleUpdate("description", e.target.value)}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 rows={2}
               />
             </div>
@@ -227,8 +266,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="instructions">Instruções</Label>
               <Textarea
                 id="instructions"
-                value={step.instructions || ""}
-                onChange={(e) => handleUpdate("instructions", e.target.value)}
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
                 rows={4}
                 placeholder="Instruções detalhadas para o usuário..."
               />
@@ -238,8 +277,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="tips">Dicas (Opcional)</Label>
               <Input
                 id="tips"
-                value={step.tips || ""}
-                onChange={(e) => handleUpdate("tips", e.target.value)}
+                value={tips}
+                onChange={(e) => setTips(e.target.value)}
                 placeholder="Dicas adicionais..."
               />
             </div>
@@ -256,7 +295,7 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="target_type">Tipo de Destino</Label>
               <Select
                 value={step.target_type}
-                onValueChange={(value) => handleUpdate("target_type", value as StepTargetType)}
+                onValueChange={(value) => handleImmediateUpdate("target_type", value as StepTargetType)}
               >
                 <SelectTrigger id="target_type">
                   <SelectValue />
@@ -273,8 +312,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
                 <Label htmlFor="target_url">URL/Rota da Página</Label>
                 <Input
                   id="target_url"
-                  value={step.target_url || ""}
-                  onChange={(e) => handleUpdate("target_url", e.target.value)}
+                  value={targetUrl}
+                  onChange={(e) => setTargetUrl(e.target.value)}
                   placeholder="/perfil/editar"
                 />
               </div>
@@ -285,8 +324,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
                 <Label htmlFor="target_selector">Seletor CSS do Modal</Label>
                 <Input
                   id="target_selector"
-                  value={step.target_selector || ""}
-                  onChange={(e) => handleUpdate("target_selector", e.target.value)}
+                  value={targetSelector}
+                  onChange={(e) => setTargetSelector(e.target.value)}
                   placeholder=".modal-config"
                 />
               </div>
@@ -296,8 +335,8 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Label htmlFor="image_url">URL da Imagem/GIF (Opcional)</Label>
               <Input
                 id="image_url"
-                value={step.image_url || ""}
-                onChange={(e) => handleUpdate("image_url", e.target.value)}
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://exemplo.com/imagem.gif"
               />
             </div>
@@ -312,7 +351,7 @@ export function StepEditor({ step, configurationId }: StepEditorProps) {
               <Switch
                 id="is_required"
                 checked={step.is_required}
-                onCheckedChange={(checked) => handleUpdate("is_required", checked)}
+                onCheckedChange={(checked) => handleImmediateUpdate("is_required", checked)}
               />
             </div>
           </CardContent>

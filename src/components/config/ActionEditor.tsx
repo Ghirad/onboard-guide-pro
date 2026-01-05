@@ -1,7 +1,9 @@
+import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDebouncedValue } from "@/hooks/useDebouncedUpdate";
 import {
   Select,
   SelectContent,
@@ -20,11 +22,44 @@ interface ActionEditorProps {
 export function ActionEditor({ action, stepId }: ActionEditorProps) {
   const updateAction = useUpdateAction();
 
-  const handleUpdate = (field: string, value: unknown) => {
+  // Debounced handlers for text fields
+  const handleDescriptionUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, description: value });
+  }, [action.id, stepId, updateAction]);
+
+  const handleSelectorUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, selector: value });
+  }, [action.id, stepId, updateAction]);
+
+  const handleValueUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, value });
+  }, [action.id, stepId, updateAction]);
+
+  const handleDelayUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, delay_ms: parseInt(value) || 0 });
+  }, [action.id, stepId, updateAction]);
+
+  const handleHighlightColorUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, highlight_color: value });
+  }, [action.id, stepId, updateAction]);
+
+  const handleHighlightDurationUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, highlight_duration_ms: parseInt(value) || 2000 });
+  }, [action.id, stepId, updateAction]);
+
+  const [description, setDescription] = useDebouncedValue(action.description || "", handleDescriptionUpdate);
+  const [selector, setSelector] = useDebouncedValue(action.selector || "", handleSelectorUpdate);
+  const [value, setValue] = useDebouncedValue(action.value || "", handleValueUpdate);
+  const [delayMs, setDelayMs] = useDebouncedValue(String(action.delay_ms || 0), handleDelayUpdate);
+  const [highlightColor, setHighlightColor] = useDebouncedValue(action.highlight_color || "#ff9f0d", handleHighlightColorUpdate);
+  const [highlightDuration, setHighlightDuration] = useDebouncedValue(String(action.highlight_duration_ms || 2000), handleHighlightDurationUpdate);
+
+  // Non-debounced update for selects/switches
+  const handleImmediateUpdate = (field: string, fieldValue: unknown) => {
     updateAction.mutate({
       id: action.id,
       stepId,
-      [field]: value,
+      [field]: fieldValue,
     });
   };
 
@@ -38,7 +73,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
           <Label>Tipo de Ação</Label>
           <Select
             value={action.action_type}
-            onValueChange={(value) => handleUpdate("action_type", value as ActionType)}
+            onValueChange={(val) => handleImmediateUpdate("action_type", val as ActionType)}
           >
             <SelectTrigger>
               <SelectValue />
@@ -57,8 +92,8 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
         <div className="space-y-2">
           <Label>Descrição</Label>
           <Input
-            value={action.description || ""}
-            onChange={(e) => handleUpdate("description", e.target.value)}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder="Descreva esta ação..."
           />
         </div>
@@ -68,8 +103,8 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
           <div className="space-y-2">
             <Label>Seletor CSS</Label>
             <Input
-              value={action.selector || ""}
-              onChange={(e) => handleUpdate("selector", e.target.value)}
+              value={selector}
+              onChange={(e) => setSelector(e.target.value)}
               placeholder="#meu-botao, .minha-classe"
             />
           </div>
@@ -82,8 +117,8 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Delay antes do click (ms)</Label>
               <Input
                 type="number"
-                value={action.delay_ms}
-                onChange={(e) => handleUpdate("delay_ms", parseInt(e.target.value) || 0)}
+                value={delayMs}
+                onChange={(e) => setDelayMs(e.target.value)}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -95,7 +130,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               </div>
               <Switch
                 checked={action.scroll_to_element}
-                onCheckedChange={(checked) => handleUpdate("scroll_to_element", checked)}
+                onCheckedChange={(checked) => handleImmediateUpdate("scroll_to_element", checked)}
               />
             </div>
           </>
@@ -107,8 +142,8 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
             <div className="space-y-2">
               <Label>Valor a preencher</Label>
               <Input
-                value={action.value || ""}
-                onChange={(e) => handleUpdate("value", e.target.value)}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 placeholder="Use {{variavel}} para valores dinâmicos"
               />
             </div>
@@ -116,7 +151,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Tipo de Input</Label>
               <Select
                 value={action.input_type}
-                onValueChange={(value) => handleUpdate("input_type", value)}
+                onValueChange={(val) => handleImmediateUpdate("input_type", val)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -139,7 +174,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Comportamento do Scroll</Label>
               <Select
                 value={action.scroll_behavior}
-                onValueChange={(value) => handleUpdate("scroll_behavior", value)}
+                onValueChange={(val) => handleImmediateUpdate("scroll_behavior", val)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -154,7 +189,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Posição do Scroll</Label>
               <Select
                 value={action.scroll_position}
-                onValueChange={(value) => handleUpdate("scroll_position", value)}
+                onValueChange={(val) => handleImmediateUpdate("scroll_position", val)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -176,8 +211,8 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Tempo de espera (ms)</Label>
               <Input
                 type="number"
-                value={action.delay_ms}
-                onChange={(e) => handleUpdate("delay_ms", parseInt(e.target.value) || 0)}
+                value={delayMs}
+                onChange={(e) => setDelayMs(e.target.value)}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -189,7 +224,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               </div>
               <Switch
                 checked={action.wait_for_element}
-                onCheckedChange={(checked) => handleUpdate("wait_for_element", checked)}
+                onCheckedChange={(checked) => handleImmediateUpdate("wait_for_element", checked)}
               />
             </div>
           </>
@@ -203,13 +238,13 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <div className="flex gap-2">
                 <Input
                   type="color"
-                  value={action.highlight_color}
-                  onChange={(e) => handleUpdate("highlight_color", e.target.value)}
+                  value={highlightColor}
+                  onChange={(e) => setHighlightColor(e.target.value)}
                   className="h-10 w-14 p-1"
                 />
                 <Input
-                  value={action.highlight_color}
-                  onChange={(e) => handleUpdate("highlight_color", e.target.value)}
+                  value={highlightColor}
+                  onChange={(e) => setHighlightColor(e.target.value)}
                   className="flex-1"
                 />
               </div>
@@ -218,15 +253,15 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <Label>Duração (ms)</Label>
               <Input
                 type="number"
-                value={action.highlight_duration_ms}
-                onChange={(e) => handleUpdate("highlight_duration_ms", parseInt(e.target.value) || 2000)}
+                value={highlightDuration}
+                onChange={(e) => setHighlightDuration(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>Tipo de Animação</Label>
               <Select
                 value={action.highlight_animation}
-                onValueChange={(value) => handleUpdate("highlight_animation", value as HighlightAnimation)}
+                onValueChange={(val) => handleImmediateUpdate("highlight_animation", val as HighlightAnimation)}
               >
                 <SelectTrigger>
                   <SelectValue />
