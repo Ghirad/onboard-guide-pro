@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useDebouncedValue } from "@/hooks/useDebouncedUpdate";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +142,23 @@ export default function ConfigEditor() {
   const updateStep = useUpdateStep();
   const deleteStep = useDeleteStep();
 
+  // Debounced values for text fields
+  const handleNameUpdate = useCallback((value: string) => {
+    if (config) updateConfiguration.mutate({ id: config.id, name: value });
+  }, [config, updateConfiguration]);
+  
+  const handleDescriptionUpdate = useCallback((value: string) => {
+    if (config) updateConfiguration.mutate({ id: config.id, description: value });
+  }, [config, updateConfiguration]);
+  
+  const handleTargetUrlUpdate = useCallback((value: string) => {
+    if (config) updateConfiguration.mutate({ id: config.id, target_url: value });
+  }, [config, updateConfiguration]);
+
+  const [name, setName] = useDebouncedValue(config?.name || "", handleNameUpdate);
+  const [description, setDescription] = useDebouncedValue(config?.description || "", handleDescriptionUpdate);
+  const [targetUrl, setTargetUrl] = useDebouncedValue(config?.target_url || "", handleTargetUrlUpdate);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -225,10 +243,8 @@ export default function ConfigEditor() {
             </Button>
             <div className="flex-1">
               <Input
-                value={config.name}
-                onChange={(e) =>
-                  updateConfiguration.mutate({ id: config.id, name: e.target.value })
-                }
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="h-auto border-0 bg-transparent p-0 text-xl font-bold focus-visible:ring-0"
                 placeholder="Nome da configuração"
               />
@@ -354,23 +370,16 @@ export default function ConfigEditor() {
                       <Label htmlFor="name">Nome</Label>
                       <Input
                         id="name"
-                        value={config.name}
-                        onChange={(e) =>
-                          updateConfiguration.mutate({ id: config.id, name: e.target.value })
-                        }
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="description">Descrição</Label>
                       <Textarea
                         id="description"
-                        value={config.description || ""}
-                        onChange={(e) =>
-                          updateConfiguration.mutate({
-                            id: config.id,
-                            description: e.target.value,
-                          })
-                        }
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                         rows={3}
                       />
                     </div>
@@ -378,13 +387,8 @@ export default function ConfigEditor() {
                       <Label htmlFor="target_url">URL da Aplicação Alvo</Label>
                       <Input
                         id="target_url"
-                        value={config.target_url}
-                        onChange={(e) =>
-                          updateConfiguration.mutate({
-                            id: config.id,
-                            target_url: e.target.value,
-                          })
-                        }
+                        value={targetUrl}
+                        onChange={(e) => setTargetUrl(e.target.value)}
                         placeholder="https://exemplo.com"
                       />
                     </div>
