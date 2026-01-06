@@ -12,7 +12,7 @@ import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
-import { StepPreviewModal } from '@/components/visual-builder/StepPreviewModal';
+// StepPreviewModal removed - preview now happens directly in iframe
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
 import { TourStepType } from '@/types/visualBuilder';
@@ -76,8 +76,7 @@ export default function VisualTourBuilder() {
   const [captureToken, setCaptureToken] = useState<string | null>(null);
   const [isCaptureReady, setIsCaptureReady] = useState(false);
   
-  // Step preview modal state
-  const [previewStep, setPreviewStep] = useState<TourStep | null>(null);
+  // previewStep state removed - preview now happens in iframe via isPreviewMode
   
   const iframeContainerRef = useRef<IframeContainerRef>(null);
 
@@ -557,7 +556,7 @@ export default function VisualTourBuilder() {
   };
 
   // Preview mode handlers
-  const handleStartPreview = useCallback(() => {
+  const handleStartPreview = useCallback((startIndex = 0) => {
     if (state.steps.length === 0) {
       toast({
         title: 'Sem passos',
@@ -569,7 +568,7 @@ export default function VisualTourBuilder() {
     setState(prev => ({
       ...prev,
       isPreviewMode: true,
-      previewStepIndex: 0,
+      previewStepIndex: startIndex,
       isSelectionMode: false,
     }));
     setShowConfigPanel(false);
@@ -620,9 +619,17 @@ export default function VisualTourBuilder() {
     if (state.isPreviewMode) {
       handleExitPreview();
     } else {
-      handleStartPreview();
+      handleStartPreview(0);
     }
   }, [state.isPreviewMode, handleExitPreview, handleStartPreview]);
+
+  // Preview individual step in iframe (instead of modal)
+  const handlePreviewStepInIframe = useCallback((step: TourStep) => {
+    const stepIndex = state.steps.findIndex(s => s.id === step.id);
+    if (stepIndex !== -1) {
+      handleStartPreview(stepIndex);
+    }
+  }, [state.steps, handleStartPreview]);
 
   // Use direct URL (no proxy)
   const iframeUrl = configuration?.target_url || '';
@@ -706,7 +713,7 @@ export default function VisualTourBuilder() {
                       onEditStep={handleEditStep}
                       onDeleteStep={handleDeleteStep}
                       onHoverStep={setHighlightSelector}
-                      onPreviewStep={setPreviewStep}
+                      onPreviewStep={handlePreviewStepInIframe}
                     />
                   </SortableContext>
                 </DndContext>
@@ -792,12 +799,7 @@ export default function VisualTourBuilder() {
         />
       )}
 
-      {/* Step Preview Modal */}
-      <StepPreviewModal
-        step={previewStep}
-        open={!!previewStep}
-        onOpenChange={(open) => !open && setPreviewStep(null)}
-      />
+      {/* Step Preview Modal removed - preview now happens in iframe */}
     </div>
   );
 }

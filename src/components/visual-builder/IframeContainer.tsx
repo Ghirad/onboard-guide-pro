@@ -206,15 +206,12 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
     }
   }, [url]);
 
-  // Switch to proxy mode when preview is active
+  // Keep iframe mode consistent with prop (don't auto-switch on preview)
   useEffect(() => {
-    if (isPreviewMode && iframeMode !== 'proxy') {
-      setIframeMode('proxy');
-      setLoadingState('loading');
-    } else if (!isPreviewMode && mode === 'direct') {
-      setIframeMode('direct');
+    if (mode !== iframeMode) {
+      setIframeMode(mode);
     }
-  }, [isPreviewMode, mode, iframeMode]);
+  }, [mode, iframeMode]);
 
   const handleIframeLoad = useCallback(() => {
     // For direct mode, mark as ready on load
