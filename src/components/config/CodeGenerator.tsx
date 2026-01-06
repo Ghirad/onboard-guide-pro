@@ -13,14 +13,17 @@ export function CodeGenerator({ config }: CodeGeneratorProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  const widgetUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/serve-widget`;
+
   const scriptCode = `<!-- Auto-Setup Widget -->
-<script src="${window.location.origin}/widget/autosetup.js"></script>
+<script src="${widgetUrl}"></script>
 <script>
   AutoSetup.init({
     configId: '${config.id}',
     apiKey: '${config.api_key}',
     position: '${config.widget_position}',
     autoStart: ${config.auto_start}
+    // allowedRoutes is configured in the dashboard and fetched automatically
   });
 </script>`;
 
@@ -95,6 +98,12 @@ export function CodeGenerator({ config }: CodeGeneratorProps) {
                 <span className="text-muted-foreground">Auto-iniciar:</span>
                 <span>{config.auto_start ? "Sim" : "Não"}</span>
               </div>
+              {config.allowed_routes && config.allowed_routes.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Rotas Permitidas:</span>
+                  <span>{config.allowed_routes.join(', ')}</span>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -120,10 +129,6 @@ export function CodeGenerator({ config }: CodeGeneratorProps) {
             <div className="rounded-lg bg-muted p-3">
               <code className="text-primary">AutoSetup.resume()</code>
               <p className="mt-1 text-muted-foreground">Retoma o setup pausado</p>
-            </div>
-            <div className="rounded-lg bg-muted p-3">
-              <code className="text-primary">AutoSetup.reset()</code>
-              <p className="mt-1 text-muted-foreground">Reinicia o setup do zero</p>
             </div>
             <div className="rounded-lg bg-muted p-3">
               <code className="text-primary">AutoSetup.goToStep(index)</code>

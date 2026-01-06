@@ -20,6 +20,8 @@ const widgetScript = `
     _listeners: {},
     _isExecutingActions: false,
     _actionAbortController: null,
+    _routeObserverActive: false,
+    _isInitialized: false,
 
     init: function(options) {
       this._config = {
@@ -29,23 +31,23 @@ const widgetScript = `
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
         actionDelay: options.actionDelay || 300,
-        allowedRoutes: options.allowedRoutes || []
+        allowedRoutes: options.allowedRoutes || null // null means "use backend config"
       };
 
-      // Check if widget should show on current route
-      if (!this._shouldShowOnCurrentRoute()) {
-        console.log('[AutoSetup] Widget not configured for this route:', window.location.pathname);
-        return this;
-      }
-
       this._loadProgress();
+      
+      // Fetch configuration first to get allowed_routes from backend
       this._fetchConfiguration().then(function() {
-        this._injectStyles();
-        this._createContainer();
-        if (this._config.autoStart) {
-          this._render();
+        // Now check if widget should show on current route
+        if (!this._shouldShowOnCurrentRoute()) {
+          console.log('[AutoSetup] Widget not configured for this route:', window.location.pathname);
+          console.log('[AutoSetup] Allowed routes:', this._config.allowedRoutes);
+          // Setup route observer to show widget when navigating to allowed route
+          this._setupRouteObserver();
+          return;
         }
-        this._emit('ready', { config: this._config });
+
+        this._initializeWidget();
       }.bind(this)).catch(function(error) {
         console.error('[AutoSetup] Failed to initialize:', error);
         this._emit('error', { error: error });
@@ -54,13 +56,75 @@ const widgetScript = `
       return this;
     },
 
+    _initializeWidget: function() {
+      if (this._isInitialized) return;
+      this._isInitialized = true;
+      
+      this._injectStyles();
+      this._createContainer();
+      if (this._config.autoStart) {
+        this._render();
+      }
+      this._setupRouteObserver();
+      this._emit('ready', { config: this._config });
+    },
+
+    _setupRouteObserver: function() {
+      if (this._routeObserverActive) return;
+      this._routeObserverActive = true;
+      
+      var self = this;
+      
+      // Listen for popstate (back/forward navigation)
+      window.addEventListener('popstate', function() {
+        self._handleRouteChange();
+      });
+      
+      // Intercept pushState and replaceState for SPA navigation
+      var originalPushState = history.pushState;
+      var originalReplaceState = history.replaceState;
+      
+      history.pushState = function() {
+        originalPushState.apply(history, arguments);
+        self._handleRouteChange();
+      };
+      
+      history.replaceState = function() {
+        originalReplaceState.apply(history, arguments);
+        self._handleRouteChange();
+      };
+      
+      console.log('[AutoSetup] Route observer active');
+    },
+
+    _handleRouteChange: function() {
+      var shouldShow = this._shouldShowOnCurrentRoute();
+      console.log('[AutoSetup] Route changed to:', window.location.pathname, '| Should show:', shouldShow);
+      
+      if (shouldShow && !this._isInitialized) {
+        // Widget should show and is not initialized yet
+        this._initializeWidget();
+      } else if (shouldShow && this._container && !this._container.innerHTML) {
+        // Widget is initialized but hidden, render it
+        this._render();
+      } else if (!shouldShow && this._container) {
+        // Widget should not show, hide it
+        this._container.innerHTML = '';
+        this._removeHighlight();
+      }
+    },
+
     _shouldShowOnCurrentRoute: function() {
       var routes = this._config.allowedRoutes;
       
-      // If no routes specified, show on all pages
-      if (!routes || routes.length === 0) return true;
+      // If no routes specified or empty array, show on all pages
+      if (!routes || routes.length === 0) {
+        console.log('[AutoSetup] No route restrictions, showing on all pages');
+        return true;
+      }
       
       var currentPath = window.location.pathname.toLowerCase();
+      console.log('[AutoSetup] Checking route:', currentPath, 'against allowed:', routes);
       
       for (var i = 0; i < routes.length; i++) {
         var route = routes[i].toLowerCase();
@@ -68,18 +132,23 @@ const widgetScript = `
         // Wildcard support: /painel/*
         if (route.endsWith('/*')) {
           var prefix = route.slice(0, -1); // Remove the *
-          if (currentPath.startsWith(prefix)) return true;
+          if (currentPath.startsWith(prefix)) {
+            console.log('[AutoSetup] Route matched wildcard:', route);
+            return true;
+          }
         } 
         // Exact match (with or without trailing slash)
         else {
           if (currentPath === route || 
               currentPath === route + '/' ||
               currentPath + '/' === route) {
+            console.log('[AutoSetup] Route matched exactly:', route);
             return true;
           }
         }
       }
       
+      console.log('[AutoSetup] No route matched');
       return false;
     },
 
@@ -175,6 +244,7 @@ const widgetScript = `
         this._container.remove();
         this._container = null;
       }
+      this._isInitialized = false;
       this._emit('destroy');
     },
 
@@ -203,6 +273,14 @@ const widgetScript = `
       .then(function(data) {
         self._steps = data.steps || [];
         self._currentStepIndex = self._findFirstIncompleteStep();
+        
+        // Use backend allowed_routes if not overridden in init options
+        if (self._config.allowedRoutes === null && data.configuration && data.configuration.allowed_routes) {
+          self._config.allowedRoutes = data.configuration.allowed_routes;
+          console.log('[AutoSetup] Using allowed_routes from backend:', self._config.allowedRoutes);
+        } else if (self._config.allowedRoutes === null) {
+          self._config.allowedRoutes = [];
+        }
       });
     },
 
@@ -436,13 +514,7 @@ const widgetScript = `
 
         var startTime = Date.now();
         var interval = setInterval(function() {
-          if (self._actionAbortController && self._actionAbortController.aborted) {
-            clearInterval(interval);
-            reject(new Error('Aborted'));
-            return;
-          }
-          
-          var el = document.querySelector(selector);
+          el = document.querySelector(selector);
           if (el) {
             clearInterval(interval);
             resolve(el);
@@ -455,142 +527,111 @@ const widgetScript = `
     },
 
     _waitDelay: function(ms) {
-      var self = this;
-      return new Promise(function(resolve) {
-        setTimeout(function() {
-          if (self._actionAbortController && self._actionAbortController.aborted) {
-            resolve();
-            return;
-          }
-          resolve();
-        }, ms || 1000);
-      });
+      return new Promise(function(resolve) { setTimeout(resolve, ms); });
     },
 
     _scrollToElement: function(selector, behavior, position) {
+      var self = this;
       return new Promise(function(resolve) {
         var el = document.querySelector(selector);
         if (el) {
-          el.scrollIntoView({
-            behavior: behavior || 'smooth',
-            block: position || 'center'
-          });
+          el.scrollIntoView({ behavior: behavior || 'smooth', block: position || 'center' });
         }
         setTimeout(resolve, 500);
       });
     },
 
     _clickElement: function(selector) {
-      return new Promise(function(resolve) {
+      var self = this;
+      return new Promise(function(resolve, reject) {
         var el = document.querySelector(selector);
         if (el) {
-          el.focus();
           el.click();
-          // Also dispatch events for frameworks
-          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          resolve();
+        } else {
+          reject(new Error('Element not found: ' + selector));
         }
-        setTimeout(resolve, 100);
       });
     },
 
     _inputValue: function(selector, value, inputType) {
-      return new Promise(function(resolve) {
+      var self = this;
+      return new Promise(function(resolve, reject) {
         var el = document.querySelector(selector);
         if (el) {
           el.focus();
-          
-          // Set value
-          var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeInputValueSetter.call(el, value || '');
-          
-          // Dispatch events for React/Vue compatibility
+          el.value = value || '';
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
+          resolve();
+        } else {
+          reject(new Error('Element not found: ' + selector));
         }
-        setTimeout(resolve, 100);
       });
     },
 
     _highlightAction: function(action) {
       var self = this;
       return new Promise(function(resolve) {
-        self._highlightWithAnimation(
-          action.selector,
-          action.highlight_color,
-          action.highlight_duration_ms,
-          action.highlight_animation
-        );
-        setTimeout(resolve, action.highlight_duration_ms || 2000);
-      });
-    },
-
-    _highlightWithAnimation: function(selector, color, duration, animation) {
-      this._removeHighlight();
-      
-      var el = document.querySelector(selector);
-      if (!el) return;
-      
-      var rect = el.getBoundingClientRect();
-      var highlight = document.createElement('div');
-      highlight.id = 'autosetup-action-highlight';
-      highlight.className = 'autosetup-highlight';
-      
-      if (animation) {
-        highlight.classList.add('autosetup-highlight-' + animation);
-      } else {
-        highlight.classList.add('autosetup-highlight-pulse');
-      }
-      
-      highlight.style.cssText = 'top:' + (rect.top + window.scrollY - 4) + 'px;' +
-        'left:' + (rect.left + window.scrollX - 4) + 'px;' +
-        'width:' + (rect.width + 8) + 'px;' +
-        'height:' + (rect.height + 8) + 'px;' +
-        'border-color:' + (color || '#6366f1') + ';';
-      
-      document.body.appendChild(highlight);
-      
-      if (duration) {
-        var self = this;
+        self._highlightElement(action.selector, action.highlight_animation, action.highlight_color);
         setTimeout(function() {
-          var h = document.getElementById('autosetup-action-highlight');
-          if (h) h.remove();
-        }, duration);
-      }
+          self._removeHighlight();
+          resolve();
+        }, action.highlight_duration_ms || 2000);
+      });
     },
 
     _openModal: function(selector) {
-      return new Promise(function(resolve) {
+      var self = this;
+      return new Promise(function(resolve, reject) {
         var el = document.querySelector(selector);
         if (el) {
           el.click();
+          resolve();
+        } else {
+          reject(new Error('Modal trigger not found: ' + selector));
         }
-        setTimeout(resolve, 300);
       });
     },
 
-    _highlightElement: function(selector) {
+    _highlightElement: function(selector, animation, color) {
       this._removeHighlight();
-      
       var el = document.querySelector(selector);
       if (!el) return;
-      
+
       var rect = el.getBoundingClientRect();
       var highlight = document.createElement('div');
       highlight.id = 'autosetup-highlight';
-      highlight.className = 'autosetup-highlight autosetup-highlight-pulse';
-      highlight.style.cssText = 'top:' + (rect.top + window.scrollY - 4) + 'px;' +
-        'left:' + (rect.left + window.scrollX - 4) + 'px;' +
+      highlight.className = 'autosetup-highlight';
+      if (animation) highlight.classList.add('autosetup-highlight-' + animation);
+      
+      highlight.style.cssText = 'left:' + (rect.left + window.scrollX - 4) + 'px;' +
+        'top:' + (rect.top + window.scrollY - 4) + 'px;' +
         'width:' + (rect.width + 8) + 'px;' +
         'height:' + (rect.height + 8) + 'px;';
+      
+      if (color) highlight.style.borderColor = color;
       
       document.body.appendChild(highlight);
     },
 
     _removeHighlight: function() {
-      var h = document.getElementById('autosetup-highlight');
-      if (h) h.remove();
-      var ah = document.getElementById('autosetup-action-highlight');
-      if (ah) ah.remove();
+      var el = document.getElementById('autosetup-highlight');
+      if (el) el.remove();
+    },
+
+    _showActionIndicator: function(message) {
+      this._hideActionIndicator();
+      var indicator = document.createElement('div');
+      indicator.id = 'autosetup-action-indicator';
+      indicator.className = 'autosetup-action-indicator';
+      indicator.innerHTML = '<div class="spinner"></div><span>' + this._escapeHtml(message) + '</span>';
+      document.body.appendChild(indicator);
+    },
+
+    _hideActionIndicator: function() {
+      var el = document.getElementById('autosetup-action-indicator');
+      if (el) el.remove();
     },
 
     _abortActions: function() {
@@ -601,27 +642,9 @@ const widgetScript = `
       this._hideActionIndicator();
     },
 
-    _showActionIndicator: function(message) {
-      var existing = document.getElementById('autosetup-action-indicator');
-      if (existing) existing.remove();
-      
-      var indicator = document.createElement('div');
-      indicator.id = 'autosetup-action-indicator';
-      indicator.className = 'autosetup-action-indicator';
-      indicator.innerHTML = '<div class="spinner"></div><span>' + this._escapeHtml(message) + '</span>';
-      document.body.appendChild(indicator);
-    },
-
-    _hideActionIndicator: function() {
-      var indicator = document.getElementById('autosetup-action-indicator');
-      if (indicator) indicator.remove();
-    },
-
-    _escapeHtml: function(text) {
-      if (!text) return '';
-      var div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+    _escapeHtml: function(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
   };
 })();
@@ -638,8 +661,8 @@ Deno.serve(async (req) => {
   return new Response(widgetScript, {
     headers: {
       ...corsHeaders,
-      'Content-Type': 'application/javascript; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
+      'Content-Type': 'application/javascript',
+      'Cache-Control': 'public, max-age=60', // Reduced cache for easier debugging
     },
   });
 });
