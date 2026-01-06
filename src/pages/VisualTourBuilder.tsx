@@ -76,7 +76,16 @@ export default function VisualTourBuilder() {
   
   const iframeContainerRef = useRef<IframeContainerRef>(null);
 
-  // Sync steps from database - with correct type mapping
+  // Auto-refetch steps while capture modal is open
+  useEffect(() => {
+    if (!showCaptureModal) return;
+    
+    const interval = setInterval(() => {
+      refetchSteps();
+    }, 3000); // Refetch every 3 seconds
+    
+    return () => clearInterval(interval);
+  }, [showCaptureModal, refetchSteps]);
   useEffect(() => {
     if (dbStepsWithActions) {
       const mappedSteps: TourStep[] = dbStepsWithActions.map((step) => {
@@ -723,6 +732,8 @@ export default function VisualTourBuilder() {
           targetUrl={configuration.target_url}
           captureToken={captureToken}
           builderOrigin={builderOrigin}
+          apiKey={configuration.api_key}
+          supabaseUrl={import.meta.env.VITE_SUPABASE_URL}
           isCaptureReady={isCaptureReady}
           selectedElement={state.selectedElement ? {
             selector: state.selectedElement.selector,
