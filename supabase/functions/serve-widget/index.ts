@@ -22,6 +22,7 @@ const widgetScript = `
     _actionAbortController: null,
     _routeObserverActive: false,
     _isInitialized: false,
+    _targetClickHandler: null,
 
     init: function(options) {
       this._config = {
@@ -31,7 +32,8 @@ const widgetScript = `
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
         actionDelay: options.actionDelay || 300,
-        allowedRoutes: options.allowedRoutes || null // null means "use backend config"
+        allowedRoutes: options.allowedRoutes || null, // null means "use backend config"
+        autoAdvanceOnClick: options.autoAdvanceOnClick !== false // auto-advance when clicking target element
       };
 
       this._loadProgress();
@@ -162,6 +164,7 @@ const widgetScript = `
     pause: function() {
       this._isMinimized = true;
       this._abortActions();
+      this._removeTargetClickListener();
       this._removeTooltip();
       this._render();
       this._emit('pause', { step: this._currentStepIndex });
@@ -176,6 +179,7 @@ const widgetScript = `
     goToStep: function(index) {
       if (index >= 0 && index < this._steps.length) {
         this._abortActions();
+        this._removeTargetClickListener();
         this._removeTooltip();
         this._currentStepIndex = index;
         this._render();
@@ -186,6 +190,7 @@ const widgetScript = `
     completeStep: function() {
       var step = this._steps[this._currentStepIndex];
       if (step) {
+        this._removeTargetClickListener();
         this._progress[step.id] = { status: 'completed', completedAt: new Date().toISOString() };
         this._saveProgress();
         this._removeTooltip();
@@ -204,6 +209,7 @@ const widgetScript = `
     skipStep: function() {
       var step = this._steps[this._currentStepIndex];
       if (step) {
+        this._removeTargetClickListener();
         this._progress[step.id] = { status: 'skipped', skippedAt: new Date().toISOString() };
         this._saveProgress();
         this._removeTooltip();
@@ -243,6 +249,7 @@ const widgetScript = `
 
     destroy: function() {
       this._abortActions();
+      this._removeTargetClickListener();
       this._removeHighlight();
       this._removeTooltip();
       this._hideActionIndicator();
@@ -394,7 +401,8 @@ const widgetScript = `
     _render: function() {
       if (!this._container) return;
       
-      // Clean up any existing tooltip
+      // Clean up any existing tooltip and listeners
+      this._removeTargetClickListener();
       this._removeTooltip();
       this._removeHighlight();
       
@@ -461,6 +469,11 @@ const widgetScript = `
         setTimeout(function() {
           self._renderTooltip(step);
           self._highlightElement(step.target_selector);
+          
+          // Auto-advance when clicking on target element
+          if (self._config.autoAdvanceOnClick) {
+            self._attachTargetClickListener(step.target_selector);
+          }
         }, 150);
       } else {
         // No selector, fall back to modal
@@ -568,6 +581,45 @@ const widgetScript = `
     _removeTooltip: function() {
       var el = document.getElementById('autosetup-tooltip');
       if (el) el.remove();
+    },
+
+    _attachTargetClickListener: function(selector) {
+      var self = this;
+      var el = document.querySelector(selector);
+      if (!el) {
+        console.log('[AutoSetup] Target element not found for auto-advance:', selector);
+        return;
+      }
+      
+      console.log('[AutoSetup] Attaching click listener to target element:', selector);
+      
+      var clickHandler = function(e) {
+        console.log('[AutoSetup] Target element clicked, auto-advancing to next step');
+        
+        // Remove listener to prevent multiple triggers
+        el.removeEventListener('click', clickHandler, true);
+        self._targetClickHandler = null;
+        
+        // Small delay to allow the natural click action to happen first
+        setTimeout(function() {
+          self.completeStep();
+        }, 100);
+      };
+      
+      // Store reference for cleanup
+      this._targetClickHandler = { element: el, handler: clickHandler };
+      
+      // Use capture phase to catch click before other handlers might stop propagation
+      el.addEventListener('click', clickHandler, true);
+    },
+
+    _removeTargetClickListener: function() {
+      if (this._targetClickHandler) {
+        console.log('[AutoSetup] Removing target click listener');
+        var target = this._targetClickHandler;
+        target.element.removeEventListener('click', target.handler, true);
+        this._targetClickHandler = null;
+      }
     },
 
     _renderTopBar: function() {
