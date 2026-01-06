@@ -424,6 +424,7 @@ export default function ConfigEditor() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="top-bar">Barra Superior</SelectItem>
                           <SelectItem value="bottom-right">Inferior Direito</SelectItem>
                           <SelectItem value="bottom-left">Inferior Esquerdo</SelectItem>
                           <SelectItem value="top-right">Superior Direito</SelectItem>
