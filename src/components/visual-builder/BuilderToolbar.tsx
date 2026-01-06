@@ -1,4 +1,4 @@
-import { MousePointer, Eye, Save, Undo, Redo, MousePointer2 } from 'lucide-react';
+import { MousePointer, Eye, Save, Undo, Redo, MousePointer2, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { Separator } from '@/components/ui/separator';
@@ -15,6 +15,7 @@ interface BuilderToolbarProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onShowCode?: () => void;
 }
 
 export function BuilderToolbar({
@@ -28,6 +29,7 @@ export function BuilderToolbar({
   canRedo = false,
   onUndo,
   onRedo,
+  onShowCode,
 }: BuilderToolbarProps) {
   return (
     <div className="flex items-center gap-2 p-2 bg-card border rounded-lg shadow-sm">
@@ -106,6 +108,24 @@ export function BuilderToolbar({
       </div>
 
       <Separator orientation="vertical" className="h-6" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShowCode}
+            disabled={isPreviewMode}
+            className="gap-2"
+          >
+            <Code className="h-4 w-4" />
+            Código
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Código de integração para seu site</p>
+        </TooltipContent>
+      </Tooltip>
 
       <div className="flex-1" />
 
