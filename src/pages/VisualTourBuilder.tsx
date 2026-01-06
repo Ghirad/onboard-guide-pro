@@ -510,6 +510,7 @@ export default function VisualTourBuilder() {
         }
       }
 
+      refetchSteps();
       toast({
         title: 'Passo atualizado',
         description: 'O passo foi atualizado.',
@@ -529,6 +530,7 @@ export default function VisualTourBuilder() {
 
     try {
       await deleteStep.mutateAsync({ id: stepId, configurationId: id! });
+      refetchSteps();
       toast({
         title: 'Passo removido',
         description: 'O passo foi removido do seu tour.',
