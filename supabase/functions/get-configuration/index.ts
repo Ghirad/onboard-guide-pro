@@ -45,10 +45,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch steps for this configuration
+    // Fetch steps for this configuration WITH their actions
     const { data: steps, error: stepsError } = await supabase
       .from('setup_steps')
-      .select('*')
+      .select(`
+        *,
+        actions:step_actions(*)
+      `)
       .eq('configuration_id', configId)
       .order('step_order', { ascending: true });
 
@@ -60,6 +63,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Sort actions within each step by action_order
+    const stepsWithSortedActions = (steps || []).map(step => ({
+      ...step,
+      actions: (step.actions || []).sort((a: any, b: any) => a.action_order - b.action_order)
+    }));
+
     // Return configuration and steps
     const response = {
       configuration: {
@@ -70,7 +79,7 @@ Deno.serve(async (req) => {
         widget_position: config.widget_position,
         auto_start: config.auto_start
       },
-      steps: steps || []
+      steps: stepsWithSortedActions
     };
 
     console.log(`[get-configuration] Returned config ${configId} with ${steps?.length || 0} steps`);
