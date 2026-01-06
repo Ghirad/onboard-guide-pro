@@ -24,6 +24,8 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
 
   const widgetUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/serve-widget`;
 
+  const allowedRoutes = (config as any).allowed_routes || [];
+  
   const scriptCode = `<!-- Auto-Setup Widget -->
 <script src="${widgetUrl}"></script>
 <script>
@@ -31,7 +33,8 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
     configId: '${config.id}',
     apiKey: '${config.api_key}',
     position: '${config.widget_position}',
-    autoStart: ${config.auto_start}
+    autoStart: ${config.auto_start}${allowedRoutes.length > 0 ? `,
+    allowedRoutes: ${JSON.stringify(allowedRoutes)}` : ''}
   });
 </script>`;
 

@@ -46,6 +46,7 @@ export type Database = {
       }
       setup_configurations: {
         Row: {
+          allowed_routes: string[] | null
           api_key: string
           auto_start: boolean | null
           created_at: string
@@ -59,6 +60,7 @@ export type Database = {
           widget_position: string | null
         }
         Insert: {
+          allowed_routes?: string[] | null
           api_key?: string
           auto_start?: boolean | null
           created_at?: string
@@ -72,6 +74,7 @@ export type Database = {
           widget_position?: string | null
         }
         Update: {
+          allowed_routes?: string[] | null
           api_key?: string
           auto_start?: boolean | null
           created_at?: string
