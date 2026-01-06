@@ -130,9 +130,9 @@ export default function VisualTourBuilder() {
       tagName: element.tagName,
       id: null,
       classList: [],
-      textContent: element.label,
+      textContent: element.label || '',
       selector: element.selector,
-      rect: element.rect,
+      rect: element.rect || { top: 0, left: 0, width: 0, height: 0 },
     };
     
     setState(prev => ({
@@ -146,9 +146,13 @@ export default function VisualTourBuilder() {
     
     toast({
       title: 'Elemento capturado',
-      description: `${element.tagName}: ${element.label.slice(0, 30)}`,
+      description: `${element.tagName}: ${(element.label || element.selector).slice(0, 30)}`,
     });
   }, [toast]);
+
+  const handleManualImport = useCallback((element: CapturedElement) => {
+    handleCapturedElement(element);
+  }, [handleCapturedElement]);
 
   const handleCapturedScan = useCallback((elements: CapturedElement[]) => {
     const getElementType = (tagName: string): ScannedElement['type'] => {
@@ -572,6 +576,7 @@ export default function VisualTourBuilder() {
           captureToken={captureToken}
           builderOrigin={builderOrigin}
           isCaptureReady={isCaptureReady}
+          onImportElement={handleManualImport}
         />
       )}
     </div>
