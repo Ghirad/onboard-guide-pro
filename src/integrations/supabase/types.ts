@@ -55,6 +55,13 @@ export type Database = {
           is_active: boolean
           name: string
           target_url: string
+          theme_background_color: string | null
+          theme_border_radius: string | null
+          theme_highlight_animation: string | null
+          theme_primary_color: string | null
+          theme_secondary_color: string | null
+          theme_template: string | null
+          theme_text_color: string | null
           updated_at: string
           user_id: string
           widget_position: string | null
@@ -69,6 +76,13 @@ export type Database = {
           is_active?: boolean
           name: string
           target_url: string
+          theme_background_color?: string | null
+          theme_border_radius?: string | null
+          theme_highlight_animation?: string | null
+          theme_primary_color?: string | null
+          theme_secondary_color?: string | null
+          theme_template?: string | null
+          theme_text_color?: string | null
           updated_at?: string
           user_id: string
           widget_position?: string | null
@@ -83,6 +97,13 @@ export type Database = {
           is_active?: boolean
           name?: string
           target_url?: string
+          theme_background_color?: string | null
+          theme_border_radius?: string | null
+          theme_highlight_animation?: string | null
+          theme_primary_color?: string | null
+          theme_secondary_color?: string | null
+          theme_template?: string | null
+          theme_text_color?: string | null
           updated_at?: string
           user_id?: string
           widget_position?: string | null

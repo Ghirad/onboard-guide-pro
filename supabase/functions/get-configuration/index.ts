@@ -78,7 +78,17 @@ Deno.serve(async (req) => {
         target_url: config.target_url,
         widget_position: config.widget_position,
         auto_start: config.auto_start,
-        allowed_routes: config.allowed_routes || []
+        allowed_routes: config.allowed_routes || [],
+        // Theme settings
+        theme: {
+          template: config.theme_template || 'modern',
+          primaryColor: config.theme_primary_color || '#6366f1',
+          secondaryColor: config.theme_secondary_color || '#8b5cf6',
+          backgroundColor: config.theme_background_color || '#ffffff',
+          textColor: config.theme_text_color || '#1f2937',
+          highlightAnimation: config.theme_highlight_animation || 'pulse',
+          borderRadius: config.theme_border_radius || 'rounded'
+        }
       },
       steps: stepsWithSortedActions
     };
