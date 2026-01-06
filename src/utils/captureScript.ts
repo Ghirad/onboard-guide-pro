@@ -242,9 +242,46 @@ export function generateCaptureScript(
     return { sent };
   }
   
+  // Find active modal root in the page (for focus trap handling)
+  function findActiveModalRoot() {
+    // Priority list of modal selectors to check
+    const modalSelectors = [
+      '[aria-modal="true"]',
+      '[role="dialog"]',
+      '.MuiModal-root',
+      '.MuiDialog-root',
+      '.MuiDrawer-root',
+      '[data-radix-portal]',
+      '.modal.show',
+      '.modal.open',
+      '.ReactModal__Overlay--after-open'
+    ];
+    
+    for (const selector of modalSelectors) {
+      const elements = document.querySelectorAll(selector);
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        const style = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        
+        // Check if element is visible
+        if (style.display !== 'none' && 
+            style.visibility !== 'hidden' && 
+            parseFloat(style.opacity) > 0 &&
+            rect.width > 0 && 
+            rect.height > 0) {
+          return el;
+        }
+      }
+    }
+    return null;
+  }
+
   // Show step configuration panel
   function showStepConfig(elementData) {
-    // Remove existing config panel if any
+    // Remove existing config panel and backdrop if any
+    const existingBackdrop = document.getElementById('tour-config-backdrop');
+    if (existingBackdrop) existingBackdrop.remove();
     if (configPanel) {
       configPanel.remove();
     }
@@ -252,8 +289,26 @@ export function generateCaptureScript(
     currentElement = elementData;
     const suggestedType = getSuggestedType(elementData.tagName);
     
+    // Find if there's an active modal to mount inside
+    const activeModalRoot = findActiveModalRoot();
+    const mountTarget = activeModalRoot || document.body;
+    
     configPanel = document.createElement('div');
     configPanel.id = 'tour-step-config';
+    
+    // Block event propagation to prevent modal from capturing events
+    const stopPropagationHandler = (e) => {
+      e.stopPropagation();
+    };
+    configPanel.addEventListener('click', stopPropagationHandler, true);
+    configPanel.addEventListener('mousedown', stopPropagationHandler, true);
+    configPanel.addEventListener('mouseup', stopPropagationHandler, true);
+    configPanel.addEventListener('pointerdown', stopPropagationHandler, true);
+    configPanel.addEventListener('keydown', stopPropagationHandler, true);
+    configPanel.addEventListener('keyup', stopPropagationHandler, true);
+    configPanel.addEventListener('keypress', stopPropagationHandler, true);
+    configPanel.addEventListener('input', stopPropagationHandler, true);
+    
     configPanel.innerHTML = \`
       <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #374151;">
         <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
@@ -333,21 +388,21 @@ export function generateCaptureScript(
     \`;
     
     // Create backdrop to block interaction with page behind
-    let backdrop = document.getElementById('tour-config-backdrop');
-    if (!backdrop) {
-      backdrop = document.createElement('div');
-      backdrop.id = 'tour-config-backdrop';
-      backdrop.style.cssText = \`
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 2147483645;
-      \`;
-      document.body.appendChild(backdrop);
-    }
+    const backdrop = document.createElement('div');
+    backdrop.id = 'tour-config-backdrop';
+    backdrop.style.cssText = \`
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2147483645;
+    \`;
+    // Also stop propagation on backdrop
+    backdrop.addEventListener('click', stopPropagationHandler, true);
+    backdrop.addEventListener('mousedown', stopPropagationHandler, true);
+    mountTarget.appendChild(backdrop);
     
     configPanel.style.cssText = \`
       position: fixed;
@@ -363,8 +418,9 @@ export function generateCaptureScript(
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
       width: 340px;
       max-width: 90vw;
+      pointer-events: auto;
     \`;
-    document.body.appendChild(configPanel);
+    mountTarget.appendChild(configPanel);
     
     // Focus the title input after appending
     setTimeout(() => {
@@ -637,6 +693,8 @@ export function generateCaptureScript(
     overlay.remove();
     tooltip.remove();
     panel.remove();
+    const backdrop = document.getElementById('tour-config-backdrop');
+    if (backdrop) backdrop.remove();
     if (configPanel) configPanel.remove();
     console.log('[Tour Capture] Desativado');
   }
@@ -656,6 +714,8 @@ export function generateCaptureScript(
     
     if (e.key === 'Escape') {
       if (configPanel) {
+        const backdrop = document.getElementById('tour-config-backdrop');
+        if (backdrop) backdrop.remove();
         configPanel.remove();
         configPanel = null;
         isActive = true;
