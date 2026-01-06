@@ -12,6 +12,7 @@ import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
+import { StepPreviewModal } from '@/components/visual-builder/StepPreviewModal';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
 import { TourStepType } from '@/types/visualBuilder';
@@ -73,6 +74,9 @@ export default function VisualTourBuilder() {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureToken, setCaptureToken] = useState<string | null>(null);
   const [isCaptureReady, setIsCaptureReady] = useState(false);
+  
+  // Step preview modal state
+  const [previewStep, setPreviewStep] = useState<TourStep | null>(null);
   
   const iframeContainerRef = useRef<IframeContainerRef>(null);
 
@@ -667,6 +671,7 @@ export default function VisualTourBuilder() {
                       onEditStep={handleEditStep}
                       onDeleteStep={handleDeleteStep}
                       onHoverStep={setHighlightSelector}
+                      onPreviewStep={setPreviewStep}
                     />
                   </SortableContext>
                 </DndContext>
@@ -751,6 +756,13 @@ export default function VisualTourBuilder() {
           }}
         />
       )}
+
+      {/* Step Preview Modal */}
+      <StepPreviewModal
+        step={previewStep}
+        open={!!previewStep}
+        onOpenChange={(open) => !open && setPreviewStep(null)}
+      />
     </div>
   );
 }
