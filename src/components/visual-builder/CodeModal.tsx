@@ -22,8 +22,10 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  const widgetUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/serve-widget`;
+
   const scriptCode = `<!-- Auto-Setup Widget -->
-<script src="${window.location.origin}/widget/autosetup.js"></script>
+<script src="${widgetUrl}"></script>
 <script>
   AutoSetup.init({
     configId: '${config.id}',
