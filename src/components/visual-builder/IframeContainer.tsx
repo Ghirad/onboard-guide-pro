@@ -3,7 +3,6 @@ import { Loader2, AlertCircle, RefreshCw, ExternalLink, Info } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { SelectedElement, TourStep } from '@/types/visualBuilder';
 import { ScannedElement } from './ElementsPanel';
-import { StepOverlay } from './StepOverlay';
 interface IframeContainerProps {
   url: string;
   mode?: 'direct' | 'proxy';
@@ -210,12 +209,19 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
     }
   }, [url]);
 
-  // Keep iframe mode consistent with prop (don't auto-switch on preview)
+  // Auto-switch to proxy mode when preview is activated
   useEffect(() => {
-    if (mode !== iframeMode) {
-      setIframeMode(mode);
+    if (isPreviewMode && iframeMode === 'direct') {
+      console.log('[IframeContainer] Switching to proxy mode for preview');
+      setIframeMode('proxy');
+      setLoadingState('loading');
+    } else if (!isPreviewMode && mode === 'direct' && iframeMode === 'proxy') {
+      // Only switch back if original mode was direct
+      console.log('[IframeContainer] Switching back to direct mode');
+      setIframeMode('direct');
+      setLoadingState('loading');
     }
-  }, [mode, iframeMode]);
+  }, [isPreviewMode, iframeMode, mode]);
 
   const handleIframeLoad = useCallback(() => {
     // For direct mode, mark as ready on load
@@ -314,16 +320,36 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
             />
           )}
 
-          {/* Step Overlay for Preview Mode */}
+          {/* Preview Controls Bar - tooltip/highlight rendered inside iframe by proxy */}
           {isPreviewMode && previewStep && loadingState === 'ready' && (
-            <StepOverlay
-              step={previewStep}
-              currentIndex={previewStepIndex}
-              totalSteps={totalSteps}
-              onNext={() => onPreviewAction?.('next')}
-              onPrev={() => onPreviewAction?.('prev')}
-              onExit={() => onPreviewAction?.('exit')}
-            />
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+              <div className="flex items-center gap-3 px-4 py-3 bg-background/95 backdrop-blur-sm rounded-full shadow-lg border">
+                <span className="text-sm text-muted-foreground">
+                  Passo {previewStepIndex + 1} de {totalSteps}
+                </span>
+                <div className="h-4 w-px bg-border" />
+                <button
+                  onClick={() => onPreviewAction?.('prev')}
+                  disabled={previewStepIndex === 0}
+                  className="px-3 py-1 text-sm rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => onPreviewAction?.('next')}
+                  className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  {previewStepIndex === totalSteps - 1 ? 'Finalizar' : 'Próximo'}
+                </button>
+                <div className="h-4 w-px bg-border" />
+                <button
+                  onClick={() => onPreviewAction?.('exit')}
+                  className="px-3 py-1 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
           )}
         </>
       ) : (
