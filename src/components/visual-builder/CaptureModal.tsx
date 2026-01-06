@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Copy, Check, ExternalLink, Terminal, MousePointer2, ClipboardPaste, AlertCircle, Settings, ChevronRight } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Copy, Check, ExternalLink, Terminal, MousePointer2, ClipboardPaste, AlertCircle, Settings, ChevronRight, Clipboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +19,13 @@ interface CapturedElement {
   rect?: { top: number; left: number; width: number; height: number };
 }
 
+interface CapturedStep {
+  stepType: string;
+  selector: string;
+  element: { tagName: string; label: string; rect: { top: number; left: number; width: number; height: number } };
+  config: { title: string; description: string | null; position: string };
+}
+
 interface CaptureModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,6 +35,7 @@ interface CaptureModalProps {
   isCaptureReady: boolean;
   selectedElement: CapturedElement | null;
   onImportElement: (element: CapturedElement) => void;
+  onImportStep?: (step: CapturedStep) => void;
   onConfigureStep: () => void;
 }
 
@@ -40,14 +48,83 @@ export function CaptureModal({
   isCaptureReady,
   selectedElement,
   onImportElement,
+  onImportStep,
   onConfigureStep,
 }: CaptureModalProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [importValue, setImportValue] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
+  const [isPasting, setIsPasting] = useState(false);
 
   const captureScript = generateCaptureScript(captureToken, builderOrigin);
+
+  // Handle paste from clipboard button
+  const handlePasteFromClipboard = useCallback(async () => {
+    setIsPasting(true);
+    setImportError(null);
+    
+    try {
+      const text = await navigator.clipboard.readText();
+      
+      if (!text.trim()) {
+        setImportError('Área de transferência vazia.');
+        setIsPasting(false);
+        return;
+      }
+      
+      // Try to parse as JSON
+      try {
+        const parsed = JSON.parse(text);
+        
+        // Format 1: TOUR_CAPTURE_STEP - complete step
+        if (parsed.type === 'TOUR_CAPTURE_STEP' && parsed.step && onImportStep) {
+          onImportStep(parsed.step);
+          toast({
+            title: '✓ Passo importado!',
+            description: parsed.step.config?.title || parsed.step.selector?.slice(0, 30),
+          });
+          setIsPasting(false);
+          return;
+        }
+        
+        // Format 2: TOUR_CAPTURE_ELEMENT
+        if (parsed.type === 'TOUR_CAPTURE_ELEMENT' && parsed.element) {
+          onImportElement(parsed.element);
+          toast({
+            title: 'Elemento importado!',
+            description: `${parsed.element.tagName}: ${parsed.element.label?.slice(0, 30) || parsed.element.selector}`,
+          });
+          setIsPasting(false);
+          return;
+        }
+        
+        // Format 3: Direct element with selector
+        if (parsed.selector) {
+          onImportElement({
+            selector: parsed.selector,
+            label: parsed.label || parsed.selector,
+            tagName: parsed.tagName || 'element',
+            rect: parsed.rect || { top: 0, left: 0, width: 0, height: 0 },
+          });
+          toast({
+            title: 'Elemento importado!',
+            description: parsed.selector.slice(0, 30),
+          });
+          setIsPasting(false);
+          return;
+        }
+        
+        setImportError('JSON não reconhecido. Capture um elemento usando o script.');
+      } catch {
+        setImportError('Conteúdo inválido na área de transferência.');
+      }
+    } catch (err) {
+      setImportError('Permissão negada. Cole manualmente no campo abaixo.');
+    }
+    
+    setIsPasting(false);
+  }, [onImportElement, onImportStep, toast]);
 
   const handleCopyScript = async () => {
     try {
@@ -335,30 +412,54 @@ export function CaptureModal({
             </div>
           </div>
 
-          {/* Manual Import Section */}
-          <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+          {/* Paste from Clipboard - Primary Action */}
+          <div className="space-y-2 p-4 border-2 border-primary rounded-lg bg-primary/5">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <ClipboardPaste className="h-4 w-4" />
-              Importar Manualmente
+              <Clipboard className="h-4 w-4 text-primary" />
+              Colar da Área de Transferência
             </div>
             <p className="text-xs text-muted-foreground">
-              Se o elemento não aparecer automaticamente, cole o JSON ou seletor aqui:
+              Após capturar um elemento no portal, clique aqui para importar automaticamente:
             </p>
-            <Textarea
-              value={importValue}
-              onChange={(e) => {
-                setImportValue(e.target.value);
-                setImportError(null);
-              }}
-              placeholder='Cole o JSON copiado ou um seletor CSS (ex: #meu-botao, .classe-elemento)'
-              className="min-h-[80px] font-mono text-xs"
-            />
+            <Button 
+              variant="default" 
+              size="default" 
+              onClick={handlePasteFromClipboard}
+              disabled={isPasting}
+              className="w-full"
+            >
+              {isPasting ? (
+                <>Colando...</>
+              ) : (
+                <>
+                  <Clipboard className="h-4 w-4 mr-2" />
+                  Colar e Importar
+                </>
+              )}
+            </Button>
             {importError && (
               <div className="flex items-center gap-2 text-xs text-destructive">
                 <AlertCircle className="h-3 w-3" />
                 {importError}
               </div>
             )}
+          </div>
+
+          {/* Manual Import Section - Secondary */}
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <ClipboardPaste className="h-4 w-4" />
+              Ou cole manualmente
+            </div>
+            <Textarea
+              value={importValue}
+              onChange={(e) => {
+                setImportValue(e.target.value);
+                setImportError(null);
+              }}
+              placeholder='Cole o JSON copiado ou um seletor CSS'
+              className="min-h-[60px] font-mono text-xs"
+            />
             <Button 
               variant="secondary" 
               size="sm" 
@@ -366,8 +467,7 @@ export function CaptureModal({
               disabled={!importValue.trim()}
               className="w-full"
             >
-              <ClipboardPaste className="h-3 w-3 mr-1" />
-              Importar Elemento
+              Importar
             </Button>
           </div>
 
