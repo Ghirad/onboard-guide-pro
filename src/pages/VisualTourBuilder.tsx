@@ -627,6 +627,7 @@ export default function VisualTourBuilder() {
             rect: state.selectedElement.rect,
           } : null}
           onImportElement={handleManualImport}
+          onImportStep={handleCapturedStep}
           onConfigureStep={() => {
             setShowCaptureModal(false);
             setShowConfigPanel(true);

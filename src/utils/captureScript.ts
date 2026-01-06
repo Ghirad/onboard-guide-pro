@@ -173,33 +173,31 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     return tagName;
   }
   
-  // Send message to builder
+  // Send message to builder - returns { sent: boolean, copied: boolean }
   function sendToBuilder(data) {
     const message = { ...data, token: TOKEN };
+    let sent = false;
     
     // Try window.opener first (works if opened via window.open)
     if (window.opener) {
       try {
         window.opener.postMessage(message, BUILDER_ORIGIN);
-        console.log('[Tour Capture] Enviado para builder:', data.type);
-        return true;
+        console.log('[Tour Capture] Enviado para builder via postMessage:', data.type);
+        sent = true;
       } catch (e) {
-        console.log('[Tour Capture] postMessage falhou, usando fallback');
+        console.log('[Tour Capture] postMessage falhou');
       }
     }
     
-    // Try BroadcastChannel as second option
-    try {
-      const channel = new BroadcastChannel('tour-builder-capture');
-      channel.postMessage(message);
-      channel.close();
-      console.log('[Tour Capture] Enviado via BroadcastChannel:', data.type);
-      return true;
-    } catch (e) {
-      console.log('[Tour Capture] BroadcastChannel não suportado');
-    }
+    // Always copy to clipboard as backup
+    const json = JSON.stringify(message, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      console.log('[Tour Capture] JSON copiado para clipboard');
+    }).catch(() => {
+      console.log('[Tour Capture] Falha ao copiar para clipboard');
+    });
     
-    return false;
+    return { sent, json };
   }
   
   // Show step configuration panel
@@ -361,10 +359,10 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
         }
       };
       
-      const sent = sendToBuilder(stepData);
+      const result = sendToBuilder(stepData);
       
-      if (sent) {
-        // Show success feedback
+      // Show appropriate feedback based on result
+      if (result.sent) {
         configPanel.innerHTML = \`
           <div style="text-align: center; padding: 20px;">
             <div style="font-size: 40px; margin-bottom: 12px;">✅</div>
@@ -379,22 +377,20 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
           isActive = true;
         }, 1500);
       } else {
-        // Fallback: copy to clipboard
-        const json = JSON.stringify(stepData, null, 2);
-        navigator.clipboard.writeText(json).then(() => {
-          configPanel.innerHTML = \`
-            <div style="text-align: center; padding: 20px;">
-              <div style="font-size: 40px; margin-bottom: 12px;">📋</div>
-              <div style="font-weight: 600; margin-bottom: 8px;">Copiado para a Área de Transferência!</div>
-              <div style="font-size: 13px; color: #9ca3af; margin-bottom: 12px;">Cole no campo "Importar Manualmente" do builder.</div>
-              <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK</button>
-            </div>
-          \`;
-          configPanel.querySelector('#step-ok').addEventListener('click', () => {
-            configPanel.remove();
-            configPanel = null;
-            isActive = true;
-          });
+        // Show clipboard fallback message
+        configPanel.innerHTML = \`
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 40px; margin-bottom: 12px;">📋</div>
+            <div style="font-weight: 600; margin-bottom: 8px;">Copiado!</div>
+            <div style="font-size: 13px; color: #9ca3af; margin-bottom: 8px;">Volte ao Tour Builder e clique em</div>
+            <div style="font-size: 14px; color: #60a5fa; font-weight: 600; margin-bottom: 12px;">"Colar da Área de Transferência"</div>
+            <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK, entendi</button>
+          </div>
+        \`;
+        configPanel.querySelector('#step-ok').addEventListener('click', () => {
+          configPanel.remove();
+          configPanel = null;
+          isActive = true;
         });
       }
     });
