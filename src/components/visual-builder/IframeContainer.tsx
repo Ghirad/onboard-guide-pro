@@ -1,11 +1,12 @@
 import { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ExternalLink, Bug } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ExternalLink, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SelectedElement, TourStep } from '@/types/visualBuilder';
 import { ScannedElement } from './ElementsPanel';
 
 interface IframeContainerProps {
-  proxyUrl: string;
+  url: string;
+  mode?: 'direct' | 'proxy';
   isSelectionMode: boolean;
   onElementSelected: (element: SelectedElement) => void;
   onIframeReady: () => void;
@@ -20,10 +21,11 @@ export interface IframeContainerRef {
   scanElements: () => void;
 }
 
-type LoadingState = 'connecting' | 'loading' | 'waiting_script' | 'ready' | 'error';
+type LoadingState = 'loading' | 'ready' | 'error';
 
 export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerProps>(({
-  proxyUrl,
+  url,
+  mode = 'direct',
   isSelectionMode,
   onElementSelected,
   onIframeReady,
@@ -34,252 +36,56 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
   onElementsScanned,
 }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const isReadyRef = useRef(false);
-  const [loadingState, setLoadingState] = useState<LoadingState>('connecting');
+  const [loadingState, setLoadingState] = useState<LoadingState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showDebug, setShowDebug] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const addDebugLog = useCallback((message: string, data?: unknown) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = data ? `${message}: ${JSON.stringify(data).slice(0, 100)}` : message;
-    console.log(`[IframeContainer] ${logMessage}`);
-    setDebugInfo(prev => [...prev.slice(-29), `${timestamp}: ${logMessage}`]);
+  // In direct mode, we can't interact with iframe content (cross-origin)
+  // Selection is handled via the external capture system
+  const scanElements = useCallback(() => {
+    // In direct mode, scanning is not available via iframe
+    // Elements are captured via the external capture script
+    console.log('[IframeContainer] Scan not available in direct mode - use Capture button');
   }, []);
 
-  const sendMessage = useCallback((message: object) => {
-    if (iframeRef.current?.contentWindow && isReadyRef.current) {
-      addDebugLog(`Sending: ${JSON.stringify(message).slice(0, 100)}`);
-      iframeRef.current.contentWindow.postMessage(message, '*');
-    }
-  }, [addDebugLog]);
-
-  const scanElements = useCallback(() => {
-    addDebugLog('Triggering element scan');
-    sendMessage({ type: 'SCAN_ELEMENTS' });
-  }, [sendMessage, addDebugLog]);
-
-  // Expose scanElements to parent
   useImperativeHandle(ref, () => ({
     scanElements,
   }), [scanElements]);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.data?.type) return;
-      
-      // Handle debug messages from injection script
-      if (event.data.type === 'TOUR_DEBUG') {
-        addDebugLog(`[Script] ${event.data.message}`, event.data.data);
-        return;
-      }
-      
-      addDebugLog(`Received: ${event.data.type}`);
-      
-      if (event.data.type === 'IFRAME_READY') {
-        // Clear any pending timeouts
-        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-        
-        // Check if there's an error from the proxy
-        if (event.data.error) {
-          addDebugLog(`Proxy error: ${event.data.error}`);
-          setLoadingState('error');
-          setErrorMessage(event.data.error);
-          return;
-        }
-        
-        isReadyRef.current = true;
-        setLoadingState('ready');
-        setErrorMessage(null);
-        
-        onIframeReady();
-        // Auto-scan elements when iframe is ready
-        setTimeout(() => scanElements(), 500);
-      } else if (event.data.type === 'ELEMENT_SELECTED') {
-        onElementSelected(event.data.data as SelectedElement);
-      } else if (event.data.type === 'PREVIEW_ACTION') {
-        onPreviewAction?.(event.data.action as 'next' | 'skip');
-      } else if (event.data.type === 'ELEMENTS_SCANNED') {
-        addDebugLog(`Scanned ${event.data.elements?.length || 0} elements`);
-        onElementsScanned?.(event.data.elements as ScannedElement[]);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onElementSelected, onIframeReady, onPreviewAction, onElementsScanned, scanElements, addDebugLog]);
-
-  useEffect(() => {
-    sendMessage({ type: 'SET_SELECTION_MODE', enabled: isSelectionMode });
-  }, [isSelectionMode, sendMessage]);
-
-  useEffect(() => {
-    sendMessage({ type: 'SET_PREVIEW_MODE', enabled: isPreviewMode });
-  }, [isPreviewMode, sendMessage]);
-
-  useEffect(() => {
-    if (!isPreviewMode || !previewStep) {
-      sendMessage({ type: 'HIDE_ALL' });
-      return;
-    }
-
-    const { type, selector, config } = previewStep;
-
-    switch (type) {
-      case 'tooltip':
-        sendMessage({
-          type: 'SHOW_TOOLTIP',
-          config: {
-            selector,
-            title: config.title,
-            description: config.description,
-            position: config.position,
-            buttonText: config.buttonText || 'Next',
-            showSkip: config.showSkip,
-            skipButtonText: config.skipButtonText,
-            imageUrl: config.imageUrl,
-          },
-        });
-        break;
-      case 'modal':
-        sendMessage({
-          type: 'SHOW_MODAL',
-          config: {
-            title: config.title,
-            description: config.description,
-            buttonText: config.buttonText || 'Next',
-            showSkip: config.showSkip,
-            skipButtonText: config.skipButtonText,
-            imageUrl: config.imageUrl,
-          },
-        });
-        break;
-      case 'highlight':
-      case 'click':
-      case 'input':
-        sendMessage({
-          type: 'SHOW_HIGHLIGHT',
-          config: {
-            selector,
-            animation: config.highlightAnimation || 'pulse',
-            color: config.highlightColor,
-          },
-        });
-        break;
-      case 'wait':
-        break;
-    }
-  }, [isPreviewMode, previewStep, sendMessage]);
-
-  useEffect(() => {
-    if (highlightSelector && !isPreviewMode) {
-      sendMessage({ type: 'HIGHLIGHT_ELEMENT', selector: highlightSelector });
-    } else if (!isPreviewMode) {
-      sendMessage({ type: 'CLEAR_HIGHLIGHT' });
-    }
-  }, [highlightSelector, isPreviewMode, sendMessage]);
-
   // Reset state when URL changes
   useEffect(() => {
-    if (proxyUrl) {
-      addDebugLog(`Loading URL: ${proxyUrl.slice(0, 80)}...`);
-      setLoadingState('connecting');
+    if (url) {
+      setLoadingState('loading');
       setErrorMessage(null);
-      setDebugInfo([]);
-      isReadyRef.current = false;
-
-      // Set a timeout for entire load process (30s for SPAs)
-      loadTimeoutRef.current = setTimeout(() => {
-        if (!isReadyRef.current) {
-          addDebugLog('Load timeout reached (30s)');
-          setLoadingState('error');
-          setErrorMessage('A página demorou muito para carregar. Verifique se a URL está correta e acessível.');
-        }
-      }, 30000);
     }
-
-    return () => {
-      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    };
-  }, [proxyUrl, addDebugLog]);
+  }, [url]);
 
   const handleIframeLoad = useCallback(() => {
-    addDebugLog('Iframe onload fired');
-    // Don't set waiting_script - the script sends IFRAME_READY immediately now
-    // Just update to loading state if we haven't received IFRAME_READY yet
-    if (!isReadyRef.current) {
-      setLoadingState('loading');
-    }
-  }, [addDebugLog]);
+    setLoadingState('ready');
+    onIframeReady();
+  }, [onIframeReady]);
 
-  const handleRetry = () => {
-    if (iframeRef.current) {
-      addDebugLog('Retrying...');
-      setLoadingState('connecting');
-      setErrorMessage(null);
-      setDebugInfo([]);
-      isReadyRef.current = false;
-      iframeRef.current.src = proxyUrl + '&t=' + Date.now();
-    }
-  };
-
-  const handleIframeError = () => {
-    addDebugLog('Iframe onerror fired');
+  const handleIframeError = useCallback(() => {
     setLoadingState('error');
     setErrorMessage('Erro ao carregar a página. A página pode bloquear carregamento em iframe ou estar inacessível.');
-  };
+  }, []);
 
-  const getTargetUrl = () => {
-    try {
-      const url = new URL(proxyUrl);
-      return url.searchParams.get('url') || '';
-    } catch {
-      return '';
+  const handleRetry = () => {
+    if (iframeRef.current && url) {
+      setLoadingState('loading');
+      setErrorMessage(null);
+      iframeRef.current.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
     }
   };
-
-  const loadingMessages: Record<LoadingState, { title: string; subtitle: string }> = {
-    connecting: { title: 'Conectando ao proxy...', subtitle: 'Iniciando conexão' },
-    loading: { title: 'Carregando página...', subtitle: 'Aguardando resposta' },
-    waiting_script: { title: 'Inicializando...', subtitle: 'Aguardando script' },
-    ready: { title: '', subtitle: '' },
-    error: { title: '', subtitle: '' },
-  };
-
-  // Show iframe even during loading (with overlay) so user sees progress
-  const showIframe = proxyUrl && loadingState !== 'error';
 
   return (
     <div className="relative w-full h-full bg-muted/20 rounded-lg overflow-hidden border">
-      {proxyUrl ? (
+      {url ? (
         <>
-          {/* Loading Overlay - show over iframe */}
-          {(loadingState === 'connecting' || loadingState === 'loading' || loadingState === 'waiting_script') && (
+          {/* Loading Overlay */}
+          {loadingState === 'loading' && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-              <p className="text-sm text-muted-foreground">{loadingMessages[loadingState].title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{loadingMessages[loadingState].subtitle}</p>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-4"
-                onClick={() => setShowDebug(!showDebug)}
-              >
-                <Bug className="h-4 w-4 mr-1" />
-                {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
-              </Button>
-              
-              {showDebug && (
-                <div className="mt-4 p-3 bg-muted rounded-lg max-w-md max-h-32 overflow-y-auto text-xs font-mono">
-                  {debugInfo.length === 0 ? (
-                    <p className="text-muted-foreground">Aguardando logs...</p>
-                  ) : (
-                    debugInfo.map((log, i) => <p key={i} className="text-muted-foreground">{log}</p>)
-                  )}
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">Carregando página...</p>
             </div>
           )}
 
@@ -297,51 +103,37 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
                   Tentar novamente
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href={getTargetUrl()} target="_blank" rel="noopener noreferrer">
+                  <a href={url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Abrir em nova aba
                   </a>
                 </Button>
               </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-4"
-                onClick={() => setShowDebug(!showDebug)}
-              >
-                <Bug className="h-4 w-4 mr-1" />
-                {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
-              </Button>
-              
-              {showDebug && (
-                <div className="mt-2 p-3 bg-muted rounded-lg max-w-lg max-h-40 overflow-y-auto text-xs font-mono">
-                  <p className="font-semibold mb-1">Debug Info:</p>
-                  <p className="text-muted-foreground break-all">Proxy: {proxyUrl}</p>
-                  <p className="text-muted-foreground">Target: {getTargetUrl()}</p>
-                  <p className="font-semibold mt-2 mb-1">Logs:</p>
-                  {debugInfo.map((log, i) => <p key={i} className="text-muted-foreground">{log}</p>)}
-                </div>
-              )}
-              
-              <p className="text-xs text-muted-foreground mt-4 text-center max-w-md">
-                Algumas páginas bloqueiam carregamento em iframe por motivos de segurança. 
-                Verifique se a URL está correta e tente acessar diretamente.
-              </p>
             </div>
           )}
 
-          {/* Iframe - visible during loading with reduced opacity */}
-          {showIframe && (
+          {/* Direct Mode Info Banner */}
+          {loadingState === 'ready' && mode === 'direct' && (
+            <div className="absolute top-2 left-2 right-2 z-10 flex items-center gap-2 px-3 py-2 bg-muted/90 backdrop-blur-sm rounded-lg text-xs">
+              <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">
+                Para selecionar elementos, use o botão <strong>"Capturar"</strong> na barra de ferramentas.
+              </span>
+            </div>
+          )}
+
+          {/* Iframe */}
+          {loadingState !== 'error' && (
             <iframe
               ref={iframeRef}
-              src={proxyUrl}
+              src={url}
               className={`w-full h-full border-0 transition-opacity duration-300 ${
                 loadingState === 'ready' ? 'opacity-100' : 'opacity-30'
               }`}
               onLoad={handleIframeLoad}
               onError={handleIframeError}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              // In direct mode, we remove sandbox to allow full site functionality
+              // This means we can't interact with the iframe content, but the site works normally
               title="Visual Builder Preview"
             />
           )}

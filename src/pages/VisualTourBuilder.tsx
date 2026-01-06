@@ -11,9 +11,17 @@ import { TourTimeline } from '@/components/visual-builder/TourTimeline';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
+import { CaptureModal } from '@/components/visual-builder/CaptureModal';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationSteps, useCreateStep, useUpdateStep, useDeleteStep } from '@/hooks/useConfigurations';
 import { useToast } from '@/hooks/use-toast';
+
+interface CapturedElement {
+  selector: string;
+  label: string;
+  tagName: string;
+  rect: { top: number; left: number; width: number; height: number };
+}
 
 export default function VisualTourBuilder() {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +51,11 @@ export default function VisualTourBuilder() {
   const [isScanning, setIsScanning] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements'>('elements');
   
+  // Capture state
+  const [showCaptureModal, setShowCaptureModal] = useState(false);
+  const [captureToken, setCaptureToken] = useState<string | null>(null);
+  const [isCaptureReady, setIsCaptureReady] = useState(false);
+  
   const iframeContainerRef = useRef<IframeContainerRef>(null);
 
   // Sync steps from database
@@ -70,6 +83,100 @@ export default function VisualTourBuilder() {
       setState(prev => ({ ...prev, steps: mappedSteps }));
     }
   }, [dbSteps]);
+
+  // Listen for capture messages from external script/extension
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data?.token || event.data.token !== captureToken) return;
+      
+      console.log('[VisualTourBuilder] Capture message:', event.data.type);
+      
+      if (event.data.type === 'TOUR_CAPTURE_READY') {
+        setIsCaptureReady(true);
+        toast({
+          title: 'Captura ativada',
+          description: 'Clique nos elementos do site para capturar.',
+        });
+      } else if (event.data.type === 'TOUR_CAPTURE_ELEMENT') {
+        handleCapturedElement(event.data.element as CapturedElement);
+      } else if (event.data.type === 'TOUR_CAPTURE_SCAN') {
+        handleCapturedScan(event.data.elements as CapturedElement[]);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    // Also listen via BroadcastChannel for extension support
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('tour-builder-capture');
+      channel.onmessage = (event) => {
+        if (event.data?.token === captureToken) {
+          handleMessage({ data: event.data } as MessageEvent);
+        }
+      };
+    } catch (e) {
+      console.log('[VisualTourBuilder] BroadcastChannel not supported');
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      channel?.close();
+    };
+  }, [captureToken, toast]);
+
+  const handleCapturedElement = useCallback((element: CapturedElement) => {
+    const selectedElement: SelectedElement = {
+      tagName: element.tagName,
+      id: null,
+      classList: [],
+      textContent: element.label,
+      selector: element.selector,
+      rect: element.rect,
+    };
+    
+    setState(prev => ({
+      ...prev,
+      selectedElement,
+      isSelectionMode: false,
+    }));
+    setShowConfigPanel(true);
+    setSidebarTab('steps');
+    setShowCaptureModal(false);
+    
+    toast({
+      title: 'Elemento capturado',
+      description: `${element.tagName}: ${element.label.slice(0, 30)}`,
+    });
+  }, [toast]);
+
+  const handleCapturedScan = useCallback((elements: CapturedElement[]) => {
+    const getElementType = (tagName: string): ScannedElement['type'] => {
+      const tag = tagName.toLowerCase();
+      if (tag === 'button') return 'button';
+      if (tag === 'a') return 'link';
+      if (tag === 'input') return 'input';
+      if (tag === 'select') return 'select';
+      if (tag === 'textarea') return 'input';
+      if (tag === 'nav') return 'navigation';
+      return 'other';
+    };
+
+    const scanned: ScannedElement[] = elements.map(el => ({
+      type: getElementType(el.tagName),
+      selector: el.selector,
+      label: el.label,
+      tagName: el.tagName,
+      rect: el.rect,
+    }));
+    setScannedElements(scanned);
+    setIsScanning(false);
+    
+    toast({
+      title: 'Elementos escaneados',
+      description: `${elements.length} elementos encontrados.`,
+    });
+  }, [toast]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -129,7 +236,6 @@ export default function VisualTourBuilder() {
 
   const handleIframeReady = useCallback(() => {
     setIframeReady(true);
-    setIsScanning(true);
   }, []);
 
   const handleElementsScanned = useCallback((elements: ScannedElement[]) => {
@@ -143,14 +249,17 @@ export default function VisualTourBuilder() {
     }
   }, [toast]);
 
+  const handleStartCapture = useCallback(() => {
+    const token = crypto.randomUUID();
+    setCaptureToken(token);
+    setIsCaptureReady(false);
+    setShowCaptureModal(true);
+  }, []);
+
   const handleScanElements = useCallback(() => {
-    setIsScanning(true);
-    setScannedElements([]);
-    // Use ref to trigger scan in iframe
-    if (iframeReady && iframeContainerRef.current) {
-      iframeContainerRef.current.scanElements();
-    }
-  }, [iframeReady]);
+    // In direct mode, open capture modal for scanning
+    handleStartCapture();
+  }, [handleStartCapture]);
 
   const handleSaveStep = async (stepData: Omit<TourStep, 'id' | 'order'>) => {
     if (!id) return;
@@ -315,9 +424,9 @@ export default function VisualTourBuilder() {
     }
   }, [state.isPreviewMode, handleExitPreview, handleStartPreview]);
 
-  const proxyUrl = configuration?.target_url
-    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-page?url=${encodeURIComponent(configuration.target_url)}`
-    : '';
+  // Use direct URL (no proxy)
+  const iframeUrl = configuration?.target_url || '';
+  const builderOrigin = window.location.origin;
 
   if (configLoading || stepsLoading) {
     return (
@@ -352,6 +461,7 @@ export default function VisualTourBuilder() {
           onToggleSelectionMode={() => setState(prev => ({ ...prev, isSelectionMode: !prev.isSelectionMode }))}
           onTogglePreviewMode={handleTogglePreviewMode}
           onSave={handleSave}
+          onStartCapture={handleStartCapture}
         />
       </header>
 
@@ -408,7 +518,8 @@ export default function VisualTourBuilder() {
         <main className={`flex-1 p-4 ${state.isPreviewMode ? 'pb-32' : ''}`}>
           <IframeContainer
             ref={iframeContainerRef}
-            proxyUrl={proxyUrl}
+            url={iframeUrl}
+            mode="direct"
             isSelectionMode={state.isSelectionMode}
             onElementSelected={handleElementSelected}
             onIframeReady={handleIframeReady}
@@ -449,6 +560,18 @@ export default function VisualTourBuilder() {
           onNext={handleNextPreviewStep}
           onPrev={handlePrevPreviewStep}
           onExit={handleExitPreview}
+        />
+      )}
+
+      {/* Capture Modal */}
+      {configuration?.target_url && captureToken && (
+        <CaptureModal
+          open={showCaptureModal}
+          onOpenChange={setShowCaptureModal}
+          targetUrl={configuration.target_url}
+          captureToken={captureToken}
+          builderOrigin={builderOrigin}
+          isCaptureReady={isCaptureReady}
         />
       )}
     </div>

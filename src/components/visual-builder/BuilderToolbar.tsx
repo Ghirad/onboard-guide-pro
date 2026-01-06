@@ -1,4 +1,4 @@
-import { MousePointer, Eye, Save, Undo, Redo, Settings } from 'lucide-react';
+import { MousePointer, Eye, Save, Undo, Redo, MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { Separator } from '@/components/ui/separator';
@@ -10,6 +10,7 @@ interface BuilderToolbarProps {
   onToggleSelectionMode: () => void;
   onTogglePreviewMode: () => void;
   onSave: () => void;
+  onStartCapture?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -22,6 +23,7 @@ export function BuilderToolbar({
   onToggleSelectionMode,
   onTogglePreviewMode,
   onSave,
+  onStartCapture,
   canUndo = false,
   canRedo = false,
   onUndo,
@@ -29,23 +31,26 @@ export function BuilderToolbar({
 }: BuilderToolbarProps) {
   return (
     <div className="flex items-center gap-2 p-2 bg-card border rounded-lg shadow-sm">
+      {/* Capture Button - Primary action */}
       <Tooltip>
         <TooltipTrigger asChild>
-          <Toggle
-            pressed={isSelectionMode}
-            onPressedChange={onToggleSelectionMode}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onStartCapture}
             disabled={isPreviewMode}
-            aria-label="Toggle selection mode"
-            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            className="gap-2"
           >
-            <MousePointer className="h-4 w-4 mr-2" />
-            Select
-          </Toggle>
+            <MousePointer2 className="h-4 w-4" />
+            Capturar
+          </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Click elements to add steps</p>
+          <p>Capturar elementos do site para criar passos</p>
         </TooltipContent>
       </Tooltip>
+
+      <Separator orientation="vertical" className="h-6" />
 
       <Tooltip>
         <TooltipTrigger asChild>
@@ -60,7 +65,7 @@ export function BuilderToolbar({
           </Toggle>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Test the tour experience</p>
+          <p>Testar experiência do tour</p>
         </TooltipContent>
       </Tooltip>
 
@@ -79,7 +84,7 @@ export function BuilderToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Undo</p>
+            <p>Desfazer</p>
           </TooltipContent>
         </Tooltip>
 
@@ -95,7 +100,7 @@ export function BuilderToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Redo</p>
+            <p>Refazer</p>
           </TooltipContent>
         </Tooltip>
       </div>
@@ -106,7 +111,7 @@ export function BuilderToolbar({
 
       <Button onClick={onSave}>
         <Save className="h-4 w-4 mr-2" />
-        Save Tour
+        Salvar Tour
       </Button>
     </div>
   );
