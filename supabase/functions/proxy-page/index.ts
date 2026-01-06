@@ -545,6 +545,7 @@ serve(async (req: Request) => {
     const targetUrl = url.searchParams.get('url');
 
     if (!targetUrl) {
+      console.error('Missing url parameter');
       return new Response(
         JSON.stringify({ error: 'Missing url parameter' }),
         { 
@@ -556,13 +557,19 @@ serve(async (req: Request) => {
 
     console.log(`Proxying request to: ${targetUrl}`);
 
+    // Follow redirects manually to handle them properly
     const response = await fetch(targetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5,pt-BR;q=0.3',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       },
+      redirect: 'follow',
     });
+
+    console.log(`Response status: ${response.status}, content-type: ${response.headers.get('content-type')}`);
 
     if (!response.ok) {
       console.error(`Fetch failed with status: ${response.status}`);
@@ -575,8 +582,24 @@ serve(async (req: Request) => {
       );
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) {
+      console.error(`Invalid content type: ${contentType}`);
+      return new Response(
+        JSON.stringify({ error: `Page is not HTML: ${contentType}` }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     let html = await response.text();
-    const baseUrl = new URL(targetUrl);
+    console.log(`Received HTML: ${html.length} bytes`);
+    
+    // Get actual final URL after redirects
+    const finalUrl = response.url || targetUrl;
+    const baseUrl = new URL(finalUrl);
     const baseHref = `${baseUrl.protocol}//${baseUrl.host}`;
 
     // Add base tag for relative URLs
@@ -584,12 +607,34 @@ serve(async (req: Request) => {
       html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseHref}/">`);
     }
 
-    // Inject our script before closing body tag
-    html = html.replace(/<\/body>/i, `${INJECTION_SCRIPT}</body>`);
+    // Inject our script before closing body tag, with error handling wrapper
+    const wrappedScript = INJECTION_SCRIPT.replace(
+      '(function() {',
+      `(function() {
+  try {
+    console.log('[TourBuilder] Initializing injection script...');`
+    ).replace(
+      "window.parent.postMessage({ type: 'IFRAME_READY' }, '*');",
+      `console.log('[TourBuilder] Sending IFRAME_READY');
+    window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
+  } catch (e) {
+    console.error('[TourBuilder] Script error:', e);
+    window.parent.postMessage({ type: 'IFRAME_READY', error: e.message }, '*');
+  }`
+    );
+
+    // If no </body> tag, append to end
+    if (html.includes('</body>')) {
+      html = html.replace(/<\/body>/i, `${wrappedScript}</body>`);
+    } else {
+      html = html + wrappedScript;
+    }
 
     // Rewrite relative URLs for assets
     html = html.replace(/href="\/(?!\/)/g, `href="${baseHref}/`);
     html = html.replace(/src="\/(?!\/)/g, `src="${baseHref}/`);
+
+    console.log(`Returning modified HTML: ${html.length} bytes`);
 
     return new Response(html, {
       status: 200,
@@ -598,6 +643,8 @@ serve(async (req: Request) => {
         'Content-Type': 'text/html; charset=utf-8',
         'X-Frame-Options': 'ALLOWALL',
         'Content-Security-Policy': "frame-ancestors *;",
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
       },
     });
   } catch (error) {
