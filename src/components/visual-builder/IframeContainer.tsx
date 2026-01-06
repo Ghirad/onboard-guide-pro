@@ -285,15 +285,6 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
             </div>
           )}
 
-          {/* Direct Mode Info Banner */}
-          {loadingState === 'ready' && iframeMode === 'direct' && !isPreviewMode && (
-            <div className="absolute top-2 left-2 right-2 z-10 flex items-center gap-2 px-3 py-2 bg-muted/90 backdrop-blur-sm rounded-lg text-xs">
-              <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-muted-foreground">
-                Para selecionar elementos, use o botão <strong>"Capturar"</strong> na barra de ferramentas.
-              </span>
-            </div>
-          )}
 
           {/* Proxy Mode Info Banner */}
           {loadingState === 'ready' && iframeMode === 'proxy' && isPreviewMode && (
