@@ -576,7 +576,18 @@ export default function VisualTourBuilder() {
           captureToken={captureToken}
           builderOrigin={builderOrigin}
           isCaptureReady={isCaptureReady}
+          selectedElement={state.selectedElement ? {
+            selector: state.selectedElement.selector,
+            label: state.selectedElement.textContent || '',
+            tagName: state.selectedElement.tagName,
+            rect: state.selectedElement.rect,
+          } : null}
           onImportElement={handleManualImport}
+          onConfigureStep={() => {
+            setShowCaptureModal(false);
+            setShowConfigPanel(true);
+            setSidebarTab('steps');
+          }}
         />
       )}
     </div>

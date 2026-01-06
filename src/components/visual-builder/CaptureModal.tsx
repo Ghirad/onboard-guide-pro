@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, ExternalLink, Terminal, MousePointer2, ClipboardPaste, AlertCircle } from 'lucide-react';
+import { Copy, Check, ExternalLink, Terminal, MousePointer2, ClipboardPaste, AlertCircle, Settings, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +16,7 @@ interface CapturedElement {
   selector: string;
   label: string;
   tagName: string;
-  rect: { top: number; left: number; width: number; height: number };
+  rect?: { top: number; left: number; width: number; height: number };
 }
 
 interface CaptureModalProps {
@@ -26,7 +26,9 @@ interface CaptureModalProps {
   captureToken: string;
   builderOrigin: string;
   isCaptureReady: boolean;
+  selectedElement: CapturedElement | null;
   onImportElement: (element: CapturedElement) => void;
+  onConfigureStep: () => void;
 }
 
 export function CaptureModal({
@@ -36,7 +38,9 @@ export function CaptureModal({
   captureToken,
   builderOrigin,
   isCaptureReady,
+  selectedElement,
   onImportElement,
+  onConfigureStep,
 }: CaptureModalProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -64,7 +68,6 @@ export function CaptureModal({
   };
 
   const handleOpenSiteWithOpener = () => {
-    // Using window.open ensures window.opener is set correctly
     window.open(targetUrl, '_blank', 'noopener=no');
     toast({
       title: 'Portal aberto',
@@ -82,11 +85,9 @@ export function CaptureModal({
     }
 
     try {
-      // Try parsing as JSON first
       const parsed = JSON.parse(value);
       
       if (parsed.element) {
-        // Full message format from capture script
         onImportElement(parsed.element);
         setImportValue('');
         toast({
@@ -94,7 +95,6 @@ export function CaptureModal({
           description: `${parsed.element.tagName}: ${parsed.element.label?.slice(0, 30) || parsed.element.selector}`,
         });
       } else if (parsed.selector) {
-        // Just the element object
         onImportElement(parsed);
         setImportValue('');
         toast({
@@ -105,7 +105,6 @@ export function CaptureModal({
         setImportError('JSON inválido. Deve conter "selector" ou "element".');
       }
     } catch {
-      // Not JSON - treat as CSS selector
       if (value.startsWith('#') || value.startsWith('.') || value.startsWith('[') || /^[a-z]/i.test(value)) {
         onImportElement({
           selector: value,
@@ -124,6 +123,21 @@ export function CaptureModal({
     }
   };
 
+  const handleConfigureClick = () => {
+    onConfigureStep();
+    onOpenChange(false);
+  };
+
+  const getElementTypeLabel = (tagName: string) => {
+    const tag = tagName.toLowerCase();
+    if (tag === 'button') return 'Botão';
+    if (tag === 'a') return 'Link';
+    if (tag === 'input') return 'Campo de entrada';
+    if (tag === 'textarea') return 'Área de texto';
+    if (tag === 'select') return 'Seletor';
+    return tagName;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -138,6 +152,66 @@ export function CaptureModal({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Captured Element Preview */}
+          {selectedElement && (
+            <div className="p-4 rounded-lg border-2 border-primary bg-primary/5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                  Elemento Capturado!
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Tipo:
+                  </span>
+                  <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">
+                    {getElementTypeLabel(selectedElement.tagName)}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex-shrink-0">
+                    Seletor:
+                  </span>
+                  <code className="text-xs font-mono break-all text-muted-foreground">
+                    {selectedElement.selector}
+                  </code>
+                </div>
+                {selectedElement.label && selectedElement.label !== selectedElement.selector && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex-shrink-0">
+                      Texto:
+                    </span>
+                    <span className="text-sm truncate">
+                      "{selectedElement.label.slice(0, 50)}"
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1"
+                  onClick={handleConfigureClick}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurar Passo
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Keep modal open to capture another
+                  }}
+                >
+                  Capturar Outro
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Status */}
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
             <div className={`w-2 h-2 rounded-full ${isCaptureReady ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
@@ -198,7 +272,7 @@ export function CaptureModal({
               <div className="flex-1">
                 <p>Clique nos elementos que deseja capturar</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  O elemento aparecerá automaticamente aqui, ou cole abaixo se não aparecer.
+                  O elemento aparecerá automaticamente acima, ou cole abaixo se não aparecer.
                 </p>
               </div>
             </div>
