@@ -207,40 +207,57 @@
 
 /* Highlight animations for theme selector */
 @keyframes highlight-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes highlight-glow {
+  0%, 100% { box-shadow: 0 0 5px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+}
+
+@keyframes highlight-border {
+  0%, 100% { border-width: 2px; }
+  50% { border-width: 4px; }
+}
+
+@keyframes highlight-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+  20%, 40%, 60%, 80% { transform: translateX(3px); }
+}
+
+@keyframes highlight-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes highlight-fade {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .animate-highlight-pulse {
   animation: highlight-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes highlight-glow {
-  0%, 100% {
-    box-shadow: 0 0 8px currentColor;
-  }
-  50% {
-    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
-  }
-}
-
 .animate-highlight-glow {
   animation: highlight-glow 1.5s ease-in-out infinite;
 }
 
-@keyframes highlight-border {
-  0%, 100% {
-    border-width: 2px;
-  }
-  50% {
-    border-width: 4px;
-  }
-}
-
 .animate-highlight-border {
   animation: highlight-border 1s ease-in-out infinite;
+}
+
+.animate-highlight-shake {
+  animation: highlight-shake 0.6s ease-in-out infinite;
+}
+
+.animate-highlight-bounce {
+  animation: highlight-bounce 0.8s ease-in-out infinite;
+}
+
+.animate-highlight-fade {
+  animation: highlight-fade 2s ease-in-out infinite;
 }

@@ -88,7 +88,9 @@ Deno.serve(async (req) => {
           textColor: config.theme_text_color || '#1f2937',
           highlightAnimation: config.theme_highlight_animation || 'pulse',
           borderRadius: config.theme_border_radius || 'rounded'
-        }
+        },
+        // Action type specific styles
+        actionTypeStyles: config.action_type_styles || {}
       },
       steps: stepsWithSortedActions
     };

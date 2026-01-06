@@ -380,9 +380,15 @@ const widgetScript = `
         .autosetup-highlight-pulse { animation: autosetup-pulse 2s infinite; }
         .autosetup-highlight-glow { box-shadow: 0 0 20px rgba(var(--autosetup-primary-rgb),0.6); animation: autosetup-glow 1.5s ease-in-out infinite; }
         .autosetup-highlight-border { animation: autosetup-border 1s ease-in-out infinite; }
+        .autosetup-highlight-shake { animation: autosetup-shake 0.6s ease-in-out infinite; }
+        .autosetup-highlight-bounce { animation: autosetup-bounce 0.8s ease-in-out infinite; }
+        .autosetup-highlight-fade { animation: autosetup-fade 2s ease-in-out infinite; }
         @keyframes autosetup-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.02); } }
         @keyframes autosetup-glow { 0%, 100% { box-shadow: 0 0 10px rgba(var(--autosetup-primary-rgb),0.4); } 50% { box-shadow: 0 0 30px rgba(var(--autosetup-primary-rgb),0.8); } }
         @keyframes autosetup-border { 0%, 100% { border-width: 2px; } 50% { border-width: 4px; } }
+        @keyframes autosetup-shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); } 20%, 40%, 60%, 80% { transform: translateX(3px); } }
+        @keyframes autosetup-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes autosetup-fade { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
         .autosetup-action-indicator { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; z-index: 2147483647; }
         .autosetup-action-indicator .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
