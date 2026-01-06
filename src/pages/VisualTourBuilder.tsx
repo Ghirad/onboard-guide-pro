@@ -12,9 +12,11 @@ import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
+import { SettingsPanel } from '@/components/visual-builder/SettingsPanel';
+import { CodeModal } from '@/components/visual-builder/CodeModal';
 // StepPreviewModal removed - preview now happens directly in iframe
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
-import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
+import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useUpdateConfiguration, SetupStepWithActions } from '@/hooks/useConfigurations';
 import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -38,6 +40,7 @@ export default function VisualTourBuilder() {
   const deleteStep = useDeleteStep();
   const createAction = useCreateAction();
   const updateAction = useUpdateAction();
+  const updateConfiguration = useUpdateConfiguration();
 
   // Helper to derive TourStepType from database step + actions
   const deriveStepType = (step: SetupStepWithActions): TourStepType => {
@@ -69,7 +72,8 @@ export default function VisualTourBuilder() {
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements'>('elements');
+  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements' | 'settings'>('elements');
+  const [showCodeModal, setShowCodeModal] = useState(false);
   
   // Capture state
   const [showCaptureModal, setShowCaptureModal] = useState(false);
@@ -657,7 +661,7 @@ export default function VisualTourBuilder() {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <header className="flex items-center gap-4 p-4 border-b bg-card">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/config/${id}`)}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -673,6 +677,7 @@ export default function VisualTourBuilder() {
           onTogglePreviewMode={handleTogglePreviewMode}
           onSave={handleSave}
           onStartCapture={handleStartCapture}
+          onShowCode={() => setShowCodeModal(true)}
         />
       </header>
 
@@ -681,10 +686,10 @@ export default function VisualTourBuilder() {
         {/* Sidebar */}
         {!state.isPreviewMode && (
           <aside className="w-80 border-r bg-card overflow-hidden flex flex-col">
-            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements')} className="flex-1 flex flex-col">
-              <TabsList className="w-full rounded-none border-b">
-                <TabsTrigger value="elements" className="flex-1">Elementos</TabsTrigger>
-                <TabsTrigger value="steps" className="flex-1">
+            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings')} className="flex-1 flex flex-col">
+              <TabsList className="w-full rounded-none border-b grid grid-cols-3">
+                <TabsTrigger value="elements">Elementos</TabsTrigger>
+                <TabsTrigger value="steps">
                   Passos
                   {state.steps.length > 0 && (
                     <span className="ml-1.5 text-xs bg-primary/10 text-primary px-1.5 rounded-full">
@@ -692,6 +697,7 @@ export default function VisualTourBuilder() {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="settings">Config</TabsTrigger>
               </TabsList>
               <TabsContent value="elements" className="flex-1 overflow-hidden m-0">
                 <ElementsPanel
@@ -721,6 +727,15 @@ export default function VisualTourBuilder() {
                     />
                   </SortableContext>
                 </DndContext>
+              </TabsContent>
+              <TabsContent value="settings" className="flex-1 overflow-y-auto m-0">
+                {configuration && (
+                  <SettingsPanel
+                    configuration={configuration}
+                    onUpdate={(updates) => updateConfiguration.mutate({ id: id!, ...updates })}
+                    isSaving={updateConfiguration.isPending}
+                  />
+                )}
               </TabsContent>
             </Tabs>
           </aside>
@@ -802,6 +817,15 @@ export default function VisualTourBuilder() {
             setShowConfigPanel(true);
             setSidebarTab('steps');
           }}
+        />
+      )}
+
+      {/* Code Modal */}
+      {configuration && (
+        <CodeModal
+          open={showCodeModal}
+          onOpenChange={setShowCodeModal}
+          config={configuration}
         />
       )}
 
