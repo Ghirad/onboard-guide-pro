@@ -32,6 +32,8 @@ interface CaptureModalProps {
   targetUrl: string;
   captureToken: string;
   builderOrigin: string;
+  apiKey: string;
+  supabaseUrl: string;
   isCaptureReady: boolean;
   selectedElement: CapturedElement | null;
   onImportElement: (element: CapturedElement) => void;
@@ -45,6 +47,8 @@ export function CaptureModal({
   targetUrl,
   captureToken,
   builderOrigin,
+  apiKey,
+  supabaseUrl,
   isCaptureReady,
   selectedElement,
   onImportElement,
@@ -57,7 +61,7 @@ export function CaptureModal({
   const [importError, setImportError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
 
-  const captureScript = generateCaptureScript(captureToken, builderOrigin);
+  const captureScript = generateCaptureScript(captureToken, builderOrigin, apiKey, supabaseUrl);
 
   // Handle paste from clipboard button
   const handlePasteFromClipboard = useCallback(async () => {

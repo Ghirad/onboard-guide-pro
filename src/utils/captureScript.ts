@@ -1,14 +1,21 @@
 /**
  * Generates a capture script that can be pasted into the browser console
  * to enable element selection and send data back to the Tour Builder.
- * Now includes an inline step configuration panel.
+ * Now includes an inline step configuration panel and auto-save to API.
  */
-export function generateCaptureScript(token: string, builderOrigin: string): string {
+export function generateCaptureScript(
+  token: string, 
+  builderOrigin: string,
+  apiKey: string,
+  supabaseUrl: string
+): string {
   return `
 (function() {
   // Configuration
   const TOKEN = '${token}';
   const BUILDER_ORIGIN = '${builderOrigin}';
+  const API_KEY = '${apiKey}';
+  const SUPABASE_URL = '${supabaseUrl}';
   
   // State
   let isActive = true;
@@ -376,56 +383,89 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     });
     
     // Save handler
-    configPanel.querySelector('#step-save').addEventListener('click', (e) => {
+    configPanel.querySelector('#step-save').addEventListener('click', async (e) => {
       e.stopPropagation();
       const title = configPanel.querySelector('#step-title').value.trim();
       const description = configPanel.querySelector('#step-description').value.trim();
       const position = configPanel.querySelector('#step-position').value;
       
-      const stepData = {
-        type: 'TOUR_CAPTURE_STEP',
-        step: {
-          stepType: selectedType,
-          selector: elementData.selector,
-          element: {
-            tagName: elementData.tagName,
-            label: elementData.label,
-            rect: elementData.rect
+      const saveButton = configPanel.querySelector('#step-save');
+      saveButton.disabled = true;
+      saveButton.innerHTML = '⏳ Salvando...';
+      
+      try {
+        // Call the Edge Function to save the step
+        const response = await fetch(SUPABASE_URL + '/functions/v1/create-step', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
           },
-          config: {
+          body: JSON.stringify({
+            configuration_id: TOKEN,
+            step_type: selectedType,
+            selector: elementData.selector,
             title: title || 'Passo ' + (Date.now() % 1000),
             description: description || null,
-            position: position
-          }
-        }
-      };
-      
-      const result = sendToBuilder(stepData);
-      
-      // Show appropriate feedback based on result
-      if (result.sent) {
-        configPanel.innerHTML = \`
-          <div style="text-align: center; padding: 20px;">
-            <div style="font-size: 40px; margin-bottom: 12px;">✅</div>
-            <div style="font-weight: 600; margin-bottom: 8px;">Passo Adicionado!</div>
-            <div style="font-size: 13px; color: #9ca3af;">O passo foi enviado para o builder.</div>
-          </div>
-        \`;
+            position: position,
+            element_data: {
+              tagName: elementData.tagName,
+              label: elementData.label,
+              rect: elementData.rect
+            }
+          })
+        });
         
-        setTimeout(() => {
-          configPanel.remove();
-          configPanel = null;
-          isActive = true;
-        }, 1500);
-      } else {
-        // Show clipboard fallback message
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          configPanel.innerHTML = \`
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 40px; margin-bottom: 12px;">✅</div>
+              <div style="font-weight: 600; margin-bottom: 8px;">Passo #\${result.step_number} Adicionado!</div>
+              <div style="font-size: 13px; color: #9ca3af;">Salvo automaticamente no tour.</div>
+            </div>
+          \`;
+          
+          setTimeout(() => {
+            configPanel.remove();
+            configPanel = null;
+            isActive = true;
+          }, 1500);
+        } else {
+          throw new Error(result.error || 'Erro ao salvar');
+        }
+      } catch (error) {
+        console.error('[Tour Capture] Erro ao salvar:', error);
+        
+        // Fallback: copy to clipboard
+        const stepData = {
+          type: 'TOUR_CAPTURE_STEP',
+          step: {
+            stepType: selectedType,
+            selector: elementData.selector,
+            element: {
+              tagName: elementData.tagName,
+              label: elementData.label,
+              rect: elementData.rect
+            },
+            config: {
+              title: title || 'Passo ' + (Date.now() % 1000),
+              description: description || null,
+              position: position
+            }
+          }
+        };
+        
+        navigator.clipboard.writeText(JSON.stringify(stepData, null, 2)).catch(() => {});
+        
         configPanel.innerHTML = \`
           <div style="text-align: center; padding: 20px;">
-            <div style="font-size: 40px; margin-bottom: 12px;">📋</div>
-            <div style="font-weight: 600; margin-bottom: 8px;">Copiado!</div>
-            <div style="font-size: 13px; color: #9ca3af; margin-bottom: 8px;">Volte ao Tour Builder e clique em</div>
-            <div style="font-size: 14px; color: #60a5fa; font-weight: 600; margin-bottom: 12px;">"Colar da Área de Transferência"</div>
-            <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK, entendi</button>
+            <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+            <div style="font-weight: 600; margin-bottom: 8px;">Erro ao salvar</div>
+            <div style="font-size: 13px; color: #9ca3af; margin-bottom: 8px;">\${error.message || 'Tente novamente'}</div>
+            <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">JSON copiado para área de transferência como backup.</div>
+            <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK</button>
           </div>
         \`;
         configPanel.querySelector('#step-ok').addEventListener('click', () => {
@@ -599,8 +639,13 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
 `;
 }
 
-export function generateCaptureScriptMinified(token: string, builderOrigin: string): string {
-  return generateCaptureScript(token, builderOrigin)
+export function generateCaptureScriptMinified(
+  token: string, 
+  builderOrigin: string,
+  apiKey: string,
+  supabaseUrl: string
+): string {
+  return generateCaptureScript(token, builderOrigin, apiKey, supabaseUrl)
     .replace(/\/\/.*$/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
