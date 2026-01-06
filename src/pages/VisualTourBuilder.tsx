@@ -84,47 +84,6 @@ export default function VisualTourBuilder() {
     }
   }, [dbSteps]);
 
-  // Listen for capture messages from external script/extension
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.data?.token || event.data.token !== captureToken) return;
-      
-      console.log('[VisualTourBuilder] Capture message:', event.data.type);
-      
-      if (event.data.type === 'TOUR_CAPTURE_READY') {
-        setIsCaptureReady(true);
-        toast({
-          title: 'Captura ativada',
-          description: 'Clique nos elementos do site para capturar.',
-        });
-      } else if (event.data.type === 'TOUR_CAPTURE_ELEMENT') {
-        handleCapturedElement(event.data.element as CapturedElement);
-      } else if (event.data.type === 'TOUR_CAPTURE_SCAN') {
-        handleCapturedScan(event.data.elements as CapturedElement[]);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    
-    // Also listen via BroadcastChannel for extension support
-    let channel: BroadcastChannel | null = null;
-    try {
-      channel = new BroadcastChannel('tour-builder-capture');
-      channel.onmessage = (event) => {
-        if (event.data?.token === captureToken) {
-          handleMessage({ data: event.data } as MessageEvent);
-        }
-      };
-    } catch (e) {
-      console.log('[VisualTourBuilder] BroadcastChannel not supported');
-    }
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      channel?.close();
-    };
-  }, [captureToken, toast]);
-
   const handleCapturedElement = useCallback((element: CapturedElement) => {
     const selectedElement: SelectedElement = {
       tagName: element.tagName,
@@ -181,6 +140,91 @@ export default function VisualTourBuilder() {
       description: `${elements.length} elementos encontrados.`,
     });
   }, [toast]);
+
+  // Handler for complete step captured from console script
+  const handleCapturedStep = useCallback(async (stepData: {
+    stepType: string;
+    selector: string;
+    element: { tagName: string; label: string; rect: { top: number; left: number; width: number; height: number } };
+    config: { title: string; description: string | null; position: string };
+  }) => {
+    if (!id) return;
+    
+    try {
+      const newOrder = state.steps.length + 1;
+      
+      await createStep.mutateAsync({
+        configurationId: id,
+        step: {
+          title: stepData.config.title || `Passo ${newOrder}`,
+          description: stepData.config.description || null,
+          instructions: stepData.config.description || null,
+          target_type: stepData.stepType === 'modal' ? 'modal' : 'page',
+          target_selector: stepData.selector,
+          step_order: newOrder,
+          is_required: true,
+        },
+      });
+      
+      toast({
+        title: '✓ Passo adicionado!',
+        description: stepData.config.title || stepData.selector.slice(0, 30),
+      });
+      
+      // Switch to steps tab to show the new step
+      setSidebarTab('steps');
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Falha ao salvar o passo.',
+        variant: 'destructive',
+      });
+    }
+  }, [id, state.steps.length, createStep, toast]);
+
+  // Listen for capture messages from external script/extension
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data?.token || event.data.token !== captureToken) return;
+      
+      console.log('[VisualTourBuilder] Capture message:', event.data.type);
+      
+      if (event.data.type === 'TOUR_CAPTURE_READY') {
+        setIsCaptureReady(true);
+        toast({
+          title: 'Captura ativada',
+          description: 'Clique nos elementos do site para capturar.',
+        });
+      } else if (event.data.type === 'TOUR_CAPTURE_ELEMENT') {
+        handleCapturedElement(event.data.element as CapturedElement);
+      } else if (event.data.type === 'TOUR_CAPTURE_SCAN') {
+        handleCapturedScan(event.data.elements as CapturedElement[]);
+      } else if (event.data.type === 'TOUR_CAPTURE_STEP') {
+        // Complete step from console script - save directly
+        handleCapturedStep(event.data.step);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    // Also listen via BroadcastChannel for extension support
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('tour-builder-capture');
+      channel.onmessage = (event) => {
+        if (event.data?.token === captureToken) {
+          handleMessage({ data: event.data } as MessageEvent);
+        }
+      };
+    } catch (e) {
+      console.log('[VisualTourBuilder] BroadcastChannel not supported');
+    }
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      channel?.close();
+    };
+  }, [captureToken, toast, handleCapturedElement, handleCapturedScan, handleCapturedStep]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),

@@ -1,6 +1,7 @@
 /**
  * Generates a capture script that can be pasted into the browser console
  * to enable element selection and send data back to the Tour Builder.
+ * Now includes an inline step configuration panel.
  */
 export function generateCaptureScript(token: string, builderOrigin: string): string {
   return `
@@ -12,6 +13,8 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   // State
   let isActive = true;
   let hoveredElement = null;
+  let configPanel = null;
+  let currentElement = null;
   
   // Create overlay element
   const overlay = document.createElement('div');
@@ -147,6 +150,29 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     return ariaLabel || title || alt || placeholder || text || el.tagName.toLowerCase();
   }
   
+  // Get suggested step type based on element
+  function getSuggestedType(tagName) {
+    const tag = tagName.toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return 'input';
+    if (tag === 'button' || tag === 'a') return 'click';
+    if (tag === 'select') return 'click';
+    return 'tooltip';
+  }
+  
+  // Get element type label in Portuguese
+  function getElementTypeLabel(tagName) {
+    const tag = tagName.toLowerCase();
+    if (tag === 'button') return 'Botão';
+    if (tag === 'a') return 'Link';
+    if (tag === 'input') return 'Campo de entrada';
+    if (tag === 'textarea') return 'Área de texto';
+    if (tag === 'select') return 'Seletor';
+    if (tag === 'img') return 'Imagem';
+    if (tag === 'div') return 'Container';
+    if (tag === 'span') return 'Texto';
+    return tagName;
+  }
+  
   // Send message to builder
   function sendToBuilder(data) {
     const message = { ...data, token: TOKEN };
@@ -156,7 +182,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
       try {
         window.opener.postMessage(message, BUILDER_ORIGIN);
         console.log('[Tour Capture] Enviado para builder:', data.type);
-        return;
+        return true;
       } catch (e) {
         console.log('[Tour Capture] postMessage falhou, usando fallback');
       }
@@ -168,20 +194,215 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
       channel.postMessage(message);
       channel.close();
       console.log('[Tour Capture] Enviado via BroadcastChannel:', data.type);
-      return;
+      return true;
     } catch (e) {
       console.log('[Tour Capture] BroadcastChannel não suportado');
     }
     
-    // Final fallback: copy to clipboard with clear instructions
-    const json = JSON.stringify(message, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-      alert('📋 Elemento copiado!\\n\\n1. Volte para o Tour Builder\\n2. Cole no campo "Importar Manualmente"\\n3. Clique em "Importar Elemento"');
-    }).catch(() => {
-      console.log('[Tour Capture] Clipboard também falhou, exibindo no console');
-      console.log('Copie o JSON abaixo e cole no campo "Importar" do builder:');
-      console.log(json);
+    return false;
+  }
+  
+  // Show step configuration panel
+  function showStepConfig(elementData) {
+    // Remove existing config panel if any
+    if (configPanel) {
+      configPanel.remove();
+    }
+    
+    currentElement = elementData;
+    const suggestedType = getSuggestedType(elementData.tagName);
+    
+    configPanel = document.createElement('div');
+    configPanel.id = 'tour-step-config';
+    configPanel.innerHTML = \`
+      <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #374151;">
+        <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          🎯 Configurar Passo
+        </div>
+        <div style="background: #374151; padding: 8px; border-radius: 6px; font-size: 12px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+            <span style="color: #9ca3af;">Tipo:</span>
+            <span style="color: #60a5fa;">\${getElementTypeLabel(elementData.tagName)}</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <span style="color: #9ca3af;">Seletor:</span>
+            <span style="color: #a5b4fc; font-family: monospace; font-size: 11px; word-break: break-all;">\${elementData.selector.slice(0, 40)}\${elementData.selector.length > 40 ? '...' : ''}</span>
+          </div>
+          \${elementData.label && elementData.label !== elementData.selector ? \`
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <span style="color: #9ca3af;">Texto:</span>
+            <span style="color: #fbbf24;">"\${elementData.label.slice(0, 30)}"</span>
+          </div>
+          \` : ''}
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #9ca3af; margin-bottom: 6px;">Tipo de Ação:</label>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+          <button class="step-type-btn" data-type="tooltip" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'tooltip' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            💬 Tooltip
+          </button>
+          <button class="step-type-btn" data-type="modal" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'modal' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            📋 Modal
+          </button>
+          <button class="step-type-btn" data-type="highlight" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'highlight' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            ✨ Highlight
+          </button>
+          <button class="step-type-btn" data-type="click" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'click' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            👆 Click
+          </button>
+          <button class="step-type-btn" data-type="input" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'input' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            ⌨️ Input
+          </button>
+          <button class="step-type-btn" data-type="wait" style="padding: 8px 4px; border: 1px solid #374151; background: \${suggestedType === 'wait' ? '#3b82f6' : '#1f2937'}; color: white; border-radius: 6px; cursor: pointer; font-size: 11px;">
+            ⏳ Esperar
+          </button>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Título:</label>
+        <input id="step-title" type="text" placeholder="Ex: Clique aqui para continuar" value="" style="width: 100%; padding: 8px 10px; border: 1px solid #374151; background: #1f2937; color: white; border-radius: 6px; font-size: 13px; box-sizing: border-box;" />
+      </div>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Descrição (opcional):</label>
+        <textarea id="step-description" placeholder="Descrição detalhada do passo..." rows="2" style="width: 100%; padding: 8px 10px; border: 1px solid #374151; background: #1f2937; color: white; border-radius: 6px; font-size: 13px; resize: none; box-sizing: border-box;"></textarea>
+      </div>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Posição:</label>
+        <select id="step-position" style="width: 100%; padding: 8px 10px; border: 1px solid #374151; background: #1f2937; color: white; border-radius: 6px; font-size: 13px;">
+          <option value="auto">Automático</option>
+          <option value="top">Acima</option>
+          <option value="bottom">Abaixo</option>
+          <option value="left">Esquerda</option>
+          <option value="right">Direita</option>
+        </select>
+      </div>
+      
+      <div style="display: flex; gap: 8px;">
+        <button id="step-cancel" style="flex: 1; padding: 10px; border: 1px solid #374151; background: transparent; color: #9ca3af; border-radius: 6px; cursor: pointer; font-size: 13px;">
+          Cancelar
+        </button>
+        <button id="step-save" style="flex: 2; padding: 10px; border: none; background: #22c55e; color: white; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;">
+          ✓ Adicionar Passo
+        </button>
+      </div>
+    \`;
+    
+    configPanel.style.cssText = \`
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #111827;
+      color: white;
+      padding: 16px;
+      border-radius: 12px;
+      font-family: system-ui, sans-serif;
+      z-index: 1000002;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      width: 340px;
+      max-width: 90vw;
+    \`;
+    document.body.appendChild(configPanel);
+    
+    // Pause capture while config is open
+    isActive = false;
+    overlay.style.display = 'none';
+    tooltip.style.display = 'none';
+    
+    // Store selected type
+    let selectedType = suggestedType;
+    
+    // Type selection handlers
+    configPanel.querySelectorAll('.step-type-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedType = btn.dataset.type;
+        configPanel.querySelectorAll('.step-type-btn').forEach(b => {
+          b.style.background = b.dataset.type === selectedType ? '#3b82f6' : '#1f2937';
+        });
+      });
     });
+    
+    // Cancel handler
+    configPanel.querySelector('#step-cancel').addEventListener('click', (e) => {
+      e.stopPropagation();
+      configPanel.remove();
+      configPanel = null;
+      isActive = true;
+    });
+    
+    // Save handler
+    configPanel.querySelector('#step-save').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const title = configPanel.querySelector('#step-title').value.trim();
+      const description = configPanel.querySelector('#step-description').value.trim();
+      const position = configPanel.querySelector('#step-position').value;
+      
+      const stepData = {
+        type: 'TOUR_CAPTURE_STEP',
+        step: {
+          stepType: selectedType,
+          selector: elementData.selector,
+          element: {
+            tagName: elementData.tagName,
+            label: elementData.label,
+            rect: elementData.rect
+          },
+          config: {
+            title: title || 'Passo ' + (Date.now() % 1000),
+            description: description || null,
+            position: position
+          }
+        }
+      };
+      
+      const sent = sendToBuilder(stepData);
+      
+      if (sent) {
+        // Show success feedback
+        configPanel.innerHTML = \`
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 40px; margin-bottom: 12px;">✅</div>
+            <div style="font-weight: 600; margin-bottom: 8px;">Passo Adicionado!</div>
+            <div style="font-size: 13px; color: #9ca3af;">O passo foi enviado para o builder.</div>
+          </div>
+        \`;
+        
+        setTimeout(() => {
+          configPanel.remove();
+          configPanel = null;
+          isActive = true;
+        }, 1500);
+      } else {
+        // Fallback: copy to clipboard
+        const json = JSON.stringify(stepData, null, 2);
+        navigator.clipboard.writeText(json).then(() => {
+          configPanel.innerHTML = \`
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 40px; margin-bottom: 12px;">📋</div>
+              <div style="font-weight: 600; margin-bottom: 8px;">Copiado para a Área de Transferência!</div>
+              <div style="font-size: 13px; color: #9ca3af; margin-bottom: 12px;">Cole no campo "Importar Manualmente" do builder.</div>
+              <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK</button>
+            </div>
+          \`;
+          configPanel.querySelector('#step-ok').addEventListener('click', () => {
+            configPanel.remove();
+            configPanel = null;
+            isActive = true;
+          });
+        });
+      }
+    });
+    
+    // Focus title input
+    setTimeout(() => {
+      configPanel.querySelector('#step-title').focus();
+    }, 100);
   }
   
   // Update overlay position
@@ -222,7 +443,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     if (!isActive) return;
     
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (el && el !== overlay && el !== tooltip && el !== panel && !panel.contains(el)) {
+    if (el && el !== overlay && el !== tooltip && el !== panel && !panel.contains(el) && (!configPanel || !configPanel.contains(el))) {
       hoveredElement = el;
       updateOverlay(el);
     }
@@ -231,6 +452,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   function handleClick(e) {
     if (!isActive || !hoveredElement) return;
     if (e.target === panel || panel.contains(e.target)) return;
+    if (configPanel && configPanel.contains(e.target)) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -238,28 +460,24 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     const el = hoveredElement;
     const rect = el.getBoundingClientRect();
     
-    sendToBuilder({
-      type: 'TOUR_CAPTURE_ELEMENT',
-      element: {
-        selector: generateSelector(el),
-        label: getElementLabel(el),
-        tagName: el.tagName.toLowerCase(),
-        rect: {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height
-        }
+    const elementData = {
+      selector: generateSelector(el),
+      label: getElementLabel(el),
+      tagName: el.tagName.toLowerCase(),
+      rect: {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
       }
-    });
+    };
     
     // Visual feedback
     overlay.style.borderColor = '#22c55e';
     overlay.style.background = 'rgba(34, 197, 94, 0.2)';
-    setTimeout(() => {
-      overlay.style.borderColor = '#3b82f6';
-      overlay.style.background = 'rgba(59, 130, 246, 0.1)';
-    }, 300);
+    
+    // Show step configuration panel
+    showStepConfig(elementData);
   }
   
   // Scan all interactive elements
@@ -306,6 +524,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     overlay.remove();
     tooltip.remove();
     panel.remove();
+    if (configPanel) configPanel.remove();
     console.log('[Tour Capture] Desativado');
   }
   
@@ -315,6 +534,21 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   
   document.getElementById('tour-capture-scan').addEventListener('click', scanElements);
   document.getElementById('tour-capture-exit').addEventListener('click', cleanup);
+  
+  // Escape key to close config panel or exit
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (configPanel) {
+        configPanel.remove();
+        configPanel = null;
+        isActive = true;
+        overlay.style.borderColor = '#3b82f6';
+        overlay.style.background = 'rgba(59, 130, 246, 0.1)';
+      } else {
+        cleanup();
+      }
+    }
+  });
   
   // Notify builder
   sendToBuilder({ type: 'TOUR_CAPTURE_READY' });

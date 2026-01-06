@@ -84,41 +84,98 @@ export function CaptureModal({
       return;
     }
 
+    // Try to parse as JSON first
     try {
       const parsed = JSON.parse(value);
       
-      if (parsed.element) {
+      // Format 1: TOUR_CAPTURE_STEP - complete step from new script
+      if (parsed.type === 'TOUR_CAPTURE_STEP' && parsed.step) {
+        const step = parsed.step;
+        onImportElement({
+          selector: step.selector,
+          label: step.element?.label || step.config?.title || step.selector,
+          tagName: step.element?.tagName || 'element',
+          rect: step.element?.rect || { top: 0, left: 0, width: 0, height: 0 },
+        });
+        setImportValue('');
+        toast({
+          title: 'Passo importado!',
+          description: step.config?.title || step.selector.slice(0, 30),
+        });
+        return;
+      }
+      
+      // Format 2: TOUR_CAPTURE_ELEMENT - wrapped element from old script
+      if (parsed.type === 'TOUR_CAPTURE_ELEMENT' && parsed.element) {
         onImportElement(parsed.element);
         setImportValue('');
         toast({
           title: 'Elemento importado!',
           description: `${parsed.element.tagName}: ${parsed.element.label?.slice(0, 30) || parsed.element.selector}`,
         });
-      } else if (parsed.selector) {
-        onImportElement(parsed);
+        return;
+      }
+      
+      // Format 3: Direct element object with "element" wrapper
+      if (parsed.element?.selector) {
+        onImportElement(parsed.element);
         setImportValue('');
         toast({
           title: 'Elemento importado!',
-          description: `${parsed.tagName}: ${parsed.label?.slice(0, 30) || parsed.selector}`,
+          description: `${parsed.element.tagName}: ${parsed.element.label?.slice(0, 30) || parsed.element.selector}`,
         });
-      } else {
-        setImportError('JSON inválido. Deve conter "selector" ou "element".');
+        return;
       }
-    } catch {
-      if (value.startsWith('#') || value.startsWith('.') || value.startsWith('[') || /^[a-z]/i.test(value)) {
+      
+      // Format 4: Direct element object with selector
+      if (parsed.selector) {
         onImportElement({
-          selector: value,
-          label: value,
-          tagName: 'element',
-          rect: { top: 0, left: 0, width: 0, height: 0 },
+          selector: parsed.selector,
+          label: parsed.label || parsed.selector,
+          tagName: parsed.tagName || 'element',
+          rect: parsed.rect || { top: 0, left: 0, width: 0, height: 0 },
         });
         setImportValue('');
         toast({
-          title: 'Seletor importado!',
-          description: value.slice(0, 50),
+          title: 'Elemento importado!',
+          description: `${parsed.tagName || 'element'}: ${(parsed.label || parsed.selector).slice(0, 30)}`,
         });
+        return;
+      }
+      
+      setImportError('JSON não reconhecido. Verifique se copiou o JSON completo do script.');
+    } catch {
+      // Not valid JSON - try as CSS selector
+      const trimmed = value.trim();
+      
+      // Check if it looks like a valid CSS selector
+      if (
+        trimmed.startsWith('#') || 
+        trimmed.startsWith('.') || 
+        trimmed.startsWith('[') || 
+        /^[a-z]/i.test(trimmed) ||
+        trimmed.includes(':nth') ||
+        trimmed.includes(' > ')
+      ) {
+        // Validate it's a usable selector
+        try {
+          document.querySelector(trimmed);
+          onImportElement({
+            selector: trimmed,
+            label: trimmed,
+            tagName: 'element',
+            rect: { top: 0, left: 0, width: 0, height: 0 },
+          });
+          setImportValue('');
+          toast({
+            title: 'Seletor importado!',
+            description: trimmed.slice(0, 50),
+          });
+        } catch {
+          setImportError('Seletor CSS inválido. Verifique a sintaxe.');
+        }
       } else {
-        setImportError('Formato inválido. Cole o JSON ou um seletor CSS válido.');
+        setImportError('Formato não reconhecido. Cole o JSON copiado ou um seletor CSS válido (ex: #botao, .classe, button).');
       }
     }
   };
