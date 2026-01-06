@@ -315,8 +315,8 @@ const widgetScript = `
 
     _getStyles: function() {
       return \`
-        .autosetup-container { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; z-index: 999999; }
-        .autosetup-topbar { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .autosetup-container { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; z-index: 2147483647; position: relative; }
+        .autosetup-topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
         .autosetup-topbar-content { display: flex; align-items: center; gap: 16px; flex: 1; }
         .autosetup-step-info { display: flex; flex-direction: column; gap: 2px; }
         .autosetup-step-title { font-weight: 600; font-size: 14px; }
@@ -330,20 +330,20 @@ const widgetScript = `
         .autosetup-btn-primary:hover { background: #f0f0ff; }
         .autosetup-btn-secondary { background: rgba(255,255,255,0.2); color: white; }
         .autosetup-btn-secondary:hover { background: rgba(255,255,255,0.3); }
-        .autosetup-minimized { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 20px; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
+        .autosetup-minimized { position: fixed; top: 20px; right: 20px; z-index: 2147483647; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 20px; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
         .autosetup-minimized:hover { transform: scale(1.05); }
-        .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid #6366f1; border-radius: 8px; z-index: 999998; transition: all 0.3s ease; }
+        .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid #6366f1; border-radius: 8px; z-index: 2147483646; transition: all 0.3s ease; }
         .autosetup-highlight-pulse { animation: autosetup-pulse 2s infinite; }
         .autosetup-highlight-glow { box-shadow: 0 0 20px rgba(99,102,241,0.6); animation: autosetup-glow 1.5s ease-in-out infinite; }
         .autosetup-highlight-border { animation: autosetup-border 1s ease-in-out infinite; }
         @keyframes autosetup-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.02); } }
         @keyframes autosetup-glow { 0%, 100% { box-shadow: 0 0 10px rgba(99,102,241,0.4); } 50% { box-shadow: 0 0 30px rgba(99,102,241,0.8); } }
         @keyframes autosetup-border { 0%, 100% { border-width: 2px; } 50% { border-width: 4px; } }
-        .autosetup-action-indicator { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; z-index: 999999; }
+        .autosetup-action-indicator { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; z-index: 2147483647; }
         .autosetup-action-indicator .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .autosetup-complete { position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 20px; text-align: center; }
-        .autosetup-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999998; }
+        .autosetup-complete { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 20px; text-align: center; }
+        .autosetup-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2147483647; }
         .autosetup-modal { background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%; color: #1f2937; }
         .autosetup-modal h3 { margin: 0 0 8px; font-size: 18px; }
         .autosetup-modal p { margin: 0 0 16px; color: #6b7280; font-size: 14px; }
