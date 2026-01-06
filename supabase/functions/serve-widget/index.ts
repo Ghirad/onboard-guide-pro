@@ -111,6 +111,7 @@ const widgetScript = `
         // Widget should not show, hide it
         this._container.innerHTML = '';
         this._removeHighlight();
+        this._removeTooltip();
       }
     },
 
@@ -161,6 +162,7 @@ const widgetScript = `
     pause: function() {
       this._isMinimized = true;
       this._abortActions();
+      this._removeTooltip();
       this._render();
       this._emit('pause', { step: this._currentStepIndex });
     },
@@ -174,6 +176,7 @@ const widgetScript = `
     goToStep: function(index) {
       if (index >= 0 && index < this._steps.length) {
         this._abortActions();
+        this._removeTooltip();
         this._currentStepIndex = index;
         this._render();
         this._emit('stepChange', { step: index, stepData: this._steps[index] });
@@ -185,6 +188,7 @@ const widgetScript = `
       if (step) {
         this._progress[step.id] = { status: 'completed', completedAt: new Date().toISOString() };
         this._saveProgress();
+        this._removeTooltip();
         this._emit('stepComplete', { step: this._currentStepIndex, stepData: step });
 
         if (this._currentStepIndex < this._steps.length - 1) {
@@ -202,6 +206,7 @@ const widgetScript = `
       if (step) {
         this._progress[step.id] = { status: 'skipped', skippedAt: new Date().toISOString() };
         this._saveProgress();
+        this._removeTooltip();
         this._emit('stepSkip', { step: this._currentStepIndex, stepData: step });
 
         if (this._currentStepIndex < this._steps.length - 1) {
@@ -239,6 +244,7 @@ const widgetScript = `
     destroy: function() {
       this._abortActions();
       this._removeHighlight();
+      this._removeTooltip();
       this._hideActionIndicator();
       if (this._container) {
         this._container.remove();
@@ -330,6 +336,10 @@ const widgetScript = `
         .autosetup-btn-primary:hover { background: #f0f0ff; }
         .autosetup-btn-secondary { background: rgba(255,255,255,0.2); color: white; }
         .autosetup-btn-secondary:hover { background: rgba(255,255,255,0.3); }
+        .autosetup-btn-modal-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
+        .autosetup-btn-modal-primary:hover { opacity: 0.9; }
+        .autosetup-btn-modal-secondary { background: #f3f4f6; color: #6b7280; }
+        .autosetup-btn-modal-secondary:hover { background: #e5e7eb; }
         .autosetup-minimized { position: fixed; top: 20px; right: 20px; z-index: 2147483647; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 20px; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
         .autosetup-minimized:hover { transform: scale(1.05); }
         .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid #6366f1; border-radius: 8px; z-index: 2147483646; transition: all 0.3s ease; }
@@ -343,11 +353,34 @@ const widgetScript = `
         .autosetup-action-indicator .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .autosetup-complete { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 20px; text-align: center; }
-        .autosetup-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2147483647; }
-        .autosetup-modal { background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%; color: #1f2937; }
-        .autosetup-modal h3 { margin: 0 0 8px; font-size: 18px; }
-        .autosetup-modal p { margin: 0 0 16px; color: #6b7280; font-size: 14px; }
-        .autosetup-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .autosetup-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2147483647; backdrop-filter: blur(4px); }
+        .autosetup-modal { background: white; border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; color: #1f2937; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+        .autosetup-modal h3 { margin: 0 0 12px; font-size: 22px; font-weight: 700; color: #111827; }
+        .autosetup-modal p { margin: 0 0 20px; color: #6b7280; font-size: 15px; line-height: 1.6; }
+        .autosetup-modal-image { width: 100%; max-height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 20px; }
+        .autosetup-modal-progress { font-size: 13px; color: #9ca3af; margin-bottom: 24px; }
+        .autosetup-modal-actions { display: flex; gap: 12px; justify-content: center; }
+        .autosetup-modal-actions .autosetup-btn { padding: 12px 24px; font-size: 14px; }
+        
+        /* Tooltip styles */
+        .autosetup-tooltip { position: fixed; z-index: 2147483647; background: white; border-radius: 12px; padding: 16px; max-width: 320px; min-width: 260px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); color: #1f2937; animation: autosetup-tooltip-appear 0.2s ease-out; }
+        @keyframes autosetup-tooltip-appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .autosetup-tooltip-arrow { position: absolute; width: 12px; height: 12px; background: white; transform: rotate(45deg); box-shadow: -2px -2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-arrow.arrow-top { bottom: -6px; left: 50%; margin-left: -6px; }
+        .autosetup-tooltip-arrow.arrow-bottom { top: -6px; left: 50%; margin-left: -6px; box-shadow: 2px 2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-arrow.arrow-left { right: -6px; top: 50%; margin-top: -6px; box-shadow: 2px -2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-arrow.arrow-right { left: -6px; top: 50%; margin-top: -6px; box-shadow: -2px 2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .autosetup-tooltip-step { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+        .autosetup-tooltip-title { font-weight: 600; font-size: 15px; color: #111827; flex: 1; }
+        .autosetup-tooltip-desc { font-size: 13px; color: #6b7280; margin-bottom: 16px; line-height: 1.5; }
+        .autosetup-tooltip-image { width: 100%; border-radius: 8px; margin-bottom: 12px; max-height: 150px; object-fit: cover; }
+        .autosetup-tooltip-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .autosetup-tooltip-actions .autosetup-btn { padding: 8px 14px; font-size: 12px; }
+        
+        /* Compact topbar for tooltip mode */
+        .autosetup-topbar-compact { position: fixed; top: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-radius: 0 0 0 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .autosetup-topbar-compact .autosetup-progress-bar { width: 80px; height: 4px; }
       \`;
     },
 
@@ -361,10 +394,25 @@ const widgetScript = `
     _render: function() {
       if (!this._container) return;
       
+      // Clean up any existing tooltip
+      this._removeTooltip();
+      this._removeHighlight();
+      
       if (this._isMinimized) {
         this._renderMinimized();
+        return;
+      }
+      
+      var step = this._steps[this._currentStepIndex];
+      if (!step) return;
+      
+      console.log('[AutoSetup] Rendering step:', step.title, 'target_type:', step.target_type);
+      
+      // Decide rendering based on target_type
+      if (step.target_type === 'modal') {
+        this._renderModal(step);
       } else {
-        this._renderTopBar();
+        this._renderTooltipMode(step);
       }
     },
 
@@ -374,6 +422,152 @@ const widgetScript = `
         '<span>📋</span>' +
         '<span>Setup: ' + progress.percentage + '%</span>' +
       '</div>';
+    },
+
+    _renderModal: function(step) {
+      var progress = this.getProgress();
+      var isLastStep = this._currentStepIndex === this._steps.length - 1;
+      var buttonText = this._currentStepIndex === 0 ? 'Começar' : (isLastStep ? 'Finalizar' : 'Próximo');
+      
+      this._container.innerHTML = '<div class="autosetup-modal-overlay">' +
+        '<div class="autosetup-modal">' +
+          (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-modal-image" alt=""/>' : '') +
+          '<h3>' + this._escapeHtml(step.title) + '</h3>' +
+          '<p>' + this._escapeHtml(step.description || '') + '</p>' +
+          '<div class="autosetup-modal-progress">Passo ' + (this._currentStepIndex + 1) + ' de ' + progress.total + '</div>' +
+          '<div class="autosetup-modal-actions">' +
+            (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    },
+
+    _renderTooltipMode: function(step) {
+      var self = this;
+      var progress = this.getProgress();
+      
+      // Render compact top bar for progress and controls
+      this._container.innerHTML = '<div class="autosetup-topbar-compact">' +
+        '<div class="autosetup-progress">' +
+          '<div class="autosetup-progress-bar"><div class="autosetup-progress-fill" style="width:' + progress.percentage + '%"></div></div>' +
+          '<span>' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
+        '</div>' +
+        '<button class="autosetup-btn autosetup-btn-secondary" style="padding:4px 8px;font-size:12px" onclick="AutoSetup.pause()">✕</button>' +
+      '</div>';
+      
+      // Render tooltip near element
+      if (step.target_selector) {
+        setTimeout(function() {
+          self._renderTooltip(step);
+          self._highlightElement(step.target_selector);
+        }, 150);
+      } else {
+        // No selector, fall back to modal
+        this._renderModal(step);
+      }
+      
+      // Execute actions if configured
+      if (this._config.autoExecuteActions && step.actions && step.actions.length > 0) {
+        setTimeout(function() { self._executeStepActions(step); }, 500);
+      }
+    },
+
+    _renderTooltip: function(step) {
+      var el = document.querySelector(step.target_selector);
+      if (!el) {
+        console.warn('[AutoSetup] Element not found for tooltip:', step.target_selector);
+        return;
+      }
+      
+      // Scroll element into view first
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      var self = this;
+      
+      // Small delay to allow scroll to complete
+      setTimeout(function() {
+        var rect = el.getBoundingClientRect();
+        var position = self._calculateTooltipPosition(rect);
+        var isLastStep = self._currentStepIndex === self._steps.length - 1;
+        var buttonText = isLastStep ? 'Finalizar' : 'Próximo';
+        
+        var tooltip = document.createElement('div');
+        tooltip.id = 'autosetup-tooltip';
+        tooltip.className = 'autosetup-tooltip';
+        
+        tooltip.innerHTML = 
+          '<div class="autosetup-tooltip-arrow arrow-' + position.arrowPosition + '"></div>' +
+          (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-tooltip-image" alt=""/>' : '') +
+          '<div class="autosetup-tooltip-header">' +
+            '<span class="autosetup-tooltip-step">Passo ' + (self._currentStepIndex + 1) + '</span>' +
+            '<span class="autosetup-tooltip-title">' + self._escapeHtml(step.title) + '</span>' +
+          '</div>' +
+          '<div class="autosetup-tooltip-desc">' + self._escapeHtml(step.description || '') + '</div>' +
+          '<div class="autosetup-tooltip-actions">' +
+            (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+          '</div>';
+        
+        tooltip.style.cssText = position.style;
+        document.body.appendChild(tooltip);
+      }, 300);
+    },
+
+    _calculateTooltipPosition: function(rect) {
+      var viewportWidth = window.innerWidth;
+      var viewportHeight = window.innerHeight;
+      var tooltipWidth = 320;
+      var tooltipHeight = 180; // estimated
+      var gap = 16;
+      
+      var position = 'bottom';
+      var left, top;
+      var arrowPosition = 'top';
+      
+      // Check space below
+      if (rect.bottom + tooltipHeight + gap < viewportHeight) {
+        position = 'bottom';
+        top = rect.bottom + gap;
+        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        arrowPosition = 'bottom';
+      } 
+      // Check space above
+      else if (rect.top - tooltipHeight - gap > 0) {
+        position = 'top';
+        top = rect.top - tooltipHeight - gap;
+        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        arrowPosition = 'top';
+      }
+      // Check space right
+      else if (rect.right + tooltipWidth + gap < viewportWidth) {
+        position = 'right';
+        left = rect.right + gap;
+        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+        arrowPosition = 'right';
+      }
+      // Default to left
+      else {
+        position = 'left';
+        left = rect.left - tooltipWidth - gap;
+        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+        arrowPosition = 'left';
+      }
+      
+      // Keep within viewport
+      left = Math.max(10, Math.min(left, viewportWidth - tooltipWidth - 10));
+      top = Math.max(10, Math.min(top, viewportHeight - tooltipHeight - 10));
+      
+      return {
+        position: position,
+        arrowPosition: arrowPosition,
+        style: 'left:' + left + 'px;top:' + top + 'px;'
+      };
+    },
+
+    _removeTooltip: function() {
+      var el = document.getElementById('autosetup-tooltip');
+      if (el) el.remove();
     },
 
     _renderTopBar: function() {
@@ -414,6 +608,7 @@ const widgetScript = `
 
     _renderComplete: function() {
       this._removeHighlight();
+      this._removeTooltip();
       this._container.innerHTML = '<div class="autosetup-complete">' +
         '<strong>🎉 Configuração concluída!</strong> Todas as etapas foram finalizadas.' +
         '<button class="autosetup-btn autosetup-btn-secondary" style="margin-left:16px" onclick="AutoSetup.destroy()">Fechar</button>' +
