@@ -4,13 +4,15 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IframeContainer } from '@/components/visual-builder/IframeContainer';
 import { StepConfigPanel } from '@/components/visual-builder/StepConfigPanel';
 import { TourTimeline } from '@/components/visual-builder/TourTimeline';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
+import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
-import { useConfiguration, useConfigurationSteps, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useStepActions } from '@/hooks/useConfigurations';
+import { useConfiguration, useConfigurationSteps, useCreateStep, useUpdateStep, useDeleteStep } from '@/hooks/useConfigurations';
 import { useToast } from '@/hooks/use-toast';
 
 export default function VisualTourBuilder() {
@@ -24,7 +26,6 @@ export default function VisualTourBuilder() {
   const createStep = useCreateStep();
   const updateStep = useUpdateStep();
   const deleteStep = useDeleteStep();
-  const createAction = useCreateAction();
 
   const [state, setState] = useState<VisualBuilderState>({
     isSelectionMode: false,
@@ -38,11 +39,14 @@ export default function VisualTourBuilder() {
   const [iframeReady, setIframeReady] = useState(false);
   const [highlightSelector, setHighlightSelector] = useState<string | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements'>('elements');
 
   // Sync steps from database
   useEffect(() => {
     if (dbSteps) {
-      const mappedSteps: TourStep[] = dbSteps.map((step, index) => ({
+      const mappedSteps: TourStep[] = dbSteps.map((step) => ({
         id: step.id,
         order: step.step_order,
         type: (step.target_type === 'modal' ? 'modal' : 'tooltip') as TourStep['type'],
@@ -84,7 +88,6 @@ export default function VisualTourBuilder() {
           order: index + 1,
         }));
 
-        // Update order in database
         newSteps.forEach(step => {
           updateStep.mutate({ id: step.id, configurationId: id!, step_order: step.order });
         });
@@ -101,11 +104,53 @@ export default function VisualTourBuilder() {
       isSelectionMode: false,
     }));
     setShowConfigPanel(true);
+    setSidebarTab('steps');
+  }, []);
+
+  const handleScannedElementClick = useCallback((element: ScannedElement) => {
+    const selectedElement: SelectedElement = {
+      tagName: element.tagName,
+      id: null,
+      classList: [],
+      textContent: element.label,
+      selector: element.selector,
+      rect: element.rect,
+    };
+    setState(prev => ({
+      ...prev,
+      selectedElement,
+      isSelectionMode: false,
+    }));
+    setShowConfigPanel(true);
+    setSidebarTab('steps');
   }, []);
 
   const handleIframeReady = useCallback(() => {
     setIframeReady(true);
+    setIsScanning(true);
   }, []);
+
+  const handleElementsScanned = useCallback((elements: ScannedElement[]) => {
+    setScannedElements(elements);
+    setIsScanning(false);
+    if (elements.length > 0) {
+      toast({
+        title: 'Elementos detectados',
+        description: `${elements.length} elementos interativos encontrados na página.`,
+      });
+    }
+  }, [toast]);
+
+  const handleScanElements = useCallback(() => {
+    setIsScanning(true);
+    setScannedElements([]);
+    // The IframeContainer will handle sending the SCAN_ELEMENTS message
+    // We need to trigger it by calling a method - for now we'll rely on the auto-scan
+    // This will be enhanced when we add a ref to IframeContainer
+    if (iframeReady) {
+      window.postMessage({ type: 'TRIGGER_SCAN' }, '*');
+    }
+  }, [iframeReady]);
 
   const handleSaveStep = async (stepData: Omit<TourStep, 'id' | 'order'>) => {
     if (!id) return;
@@ -116,7 +161,7 @@ export default function VisualTourBuilder() {
       await createStep.mutateAsync({
         configurationId: id,
         step: {
-          title: stepData.config.title || `Step ${newOrder}`,
+          title: stepData.config.title || `Passo ${newOrder}`,
           description: stepData.config.description || null,
           instructions: stepData.config.description || null,
           target_type: stepData.type === 'modal' ? 'modal' : 'page',
@@ -126,14 +171,17 @@ export default function VisualTourBuilder() {
         },
       });
 
+      setShowConfigPanel(false);
+      setState(prev => ({ ...prev, selectedElement: null }));
+
       toast({
-        title: 'Step added',
-        description: 'The step was added to your tour.',
+        title: 'Passo adicionado',
+        description: 'O passo foi adicionado ao seu tour.',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to save step.',
+        title: 'Erro',
+        description: 'Falha ao salvar o passo.',
         variant: 'destructive',
       });
     }
@@ -151,13 +199,13 @@ export default function VisualTourBuilder() {
       });
 
       toast({
-        title: 'Step updated',
-        description: 'The step was updated.',
+        title: 'Passo atualizado',
+        description: 'O passo foi atualizado.',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to update step.',
+        title: 'Erro',
+        description: 'Falha ao atualizar o passo.',
         variant: 'destructive',
       });
     }
@@ -170,13 +218,13 @@ export default function VisualTourBuilder() {
     try {
       await deleteStep.mutateAsync({ id: stepId, configurationId: id! });
       toast({
-        title: 'Step deleted',
-        description: 'The step was removed from your tour.',
+        title: 'Passo removido',
+        description: 'O passo foi removido do seu tour.',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to delete step.',
+        title: 'Erro',
+        description: 'Falha ao remover o passo.',
         variant: 'destructive',
       });
     }
@@ -193,8 +241,8 @@ export default function VisualTourBuilder() {
 
   const handleSave = () => {
     toast({
-      title: 'Tour saved',
-      description: 'Your tour configuration has been saved.',
+      title: 'Tour salvo',
+      description: 'Sua configuração de tour foi salva.',
     });
     navigate(`/config/${id}`);
   };
@@ -203,8 +251,8 @@ export default function VisualTourBuilder() {
   const handleStartPreview = useCallback(() => {
     if (state.steps.length === 0) {
       toast({
-        title: 'No steps',
-        description: 'Add at least one step to preview the tour.',
+        title: 'Sem passos',
+        description: 'Adicione pelo menos um passo para visualizar o tour.',
         variant: 'destructive',
       });
       return;
@@ -230,8 +278,8 @@ export default function VisualTourBuilder() {
     setState(prev => {
       if (prev.previewStepIndex >= prev.steps.length - 1) {
         toast({
-          title: 'Tour Complete',
-          description: 'You have finished previewing the tour.',
+          title: 'Tour Completo',
+          description: 'Você terminou de visualizar o tour.',
         });
         return {
           ...prev,
@@ -309,26 +357,50 @@ export default function VisualTourBuilder() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - Steps Timeline */}
+        {/* Sidebar */}
         {!state.isPreviewMode && (
-          <aside className="w-80 border-r bg-card overflow-y-auto">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={state.steps.map(s => s.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <TourTimeline
-                  steps={state.steps}
-                  onEditStep={handleEditStep}
-                  onDeleteStep={handleDeleteStep}
-                  onHoverStep={setHighlightSelector}
+          <aside className="w-80 border-r bg-card overflow-hidden flex flex-col">
+            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements')} className="flex-1 flex flex-col">
+              <TabsList className="w-full rounded-none border-b">
+                <TabsTrigger value="elements" className="flex-1">Elementos</TabsTrigger>
+                <TabsTrigger value="steps" className="flex-1">
+                  Passos
+                  {state.steps.length > 0 && (
+                    <span className="ml-1.5 text-xs bg-primary/10 text-primary px-1.5 rounded-full">
+                      {state.steps.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="elements" className="flex-1 overflow-hidden m-0">
+                <ElementsPanel
+                  elements={scannedElements}
+                  isLoading={isScanning}
+                  onElementClick={handleScannedElementClick}
+                  onElementHover={setHighlightSelector}
+                  onScanElements={handleScanElements}
                 />
-              </SortableContext>
-            </DndContext>
+              </TabsContent>
+              <TabsContent value="steps" className="flex-1 overflow-y-auto m-0">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={state.steps.map(s => s.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TourTimeline
+                      steps={state.steps}
+                      onEditStep={handleEditStep}
+                      onDeleteStep={handleDeleteStep}
+                      onHoverStep={setHighlightSelector}
+                    />
+                  </SortableContext>
+                </DndContext>
+              </TabsContent>
+            </Tabs>
           </aside>
         )}
 
@@ -343,6 +415,7 @@ export default function VisualTourBuilder() {
             isPreviewMode={state.isPreviewMode}
             previewStep={currentPreviewStep}
             onPreviewAction={handlePreviewAction}
+            onElementsScanned={handleElementsScanned}
           />
         </main>
 
