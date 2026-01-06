@@ -732,6 +732,7 @@ export default function VisualTourBuilder() {
           targetUrl={configuration.target_url}
           captureToken={captureToken}
           builderOrigin={builderOrigin}
+          configurationId={id!}
           apiKey={configuration.api_key}
           supabaseUrl={import.meta.env.VITE_SUPABASE_URL}
           isCaptureReady={isCaptureReady}

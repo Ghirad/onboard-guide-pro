@@ -90,7 +90,7 @@ serve(async (req) => {
 
     const nextOrder = existingSteps && existingSteps.length > 0 
       ? existingSteps[0].step_order + 1 
-      : 1;
+      : 0;
 
     console.log('[create-step] Next step order:', nextOrder);
 
@@ -131,7 +131,7 @@ serve(async (req) => {
           step_id: newStep.id,
           action_type: step_type,
           selector: selector,
-          action_order: 1,
+          action_order: 0,
           description: description || null,
         });
 
