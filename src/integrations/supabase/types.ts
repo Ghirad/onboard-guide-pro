@@ -46,6 +46,7 @@ export type Database = {
       }
       setup_configurations: {
         Row: {
+          action_type_styles: Json | null
           allowed_routes: string[] | null
           api_key: string
           auto_start: boolean | null
@@ -67,6 +68,7 @@ export type Database = {
           widget_position: string | null
         }
         Insert: {
+          action_type_styles?: Json | null
           allowed_routes?: string[] | null
           api_key?: string
           auto_start?: boolean | null
@@ -88,6 +90,7 @@ export type Database = {
           widget_position?: string | null
         }
         Update: {
+          action_type_styles?: Json | null
           allowed_routes?: string[] | null
           api_key?: string
           auto_start?: boolean | null

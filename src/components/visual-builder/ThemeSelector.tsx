@@ -3,7 +3,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { Check, Palette, Sparkles } from 'lucide-react';
+import { Check, Palette, Sparkles, Layers } from 'lucide-react';
+import { ActionTypeStyleEditor, ActionTypeStyles } from './ActionTypeStyleEditor';
 
 export interface ThemeConfig {
   template: string;
@@ -13,6 +14,7 @@ export interface ThemeConfig {
   textColor: string;
   highlightAnimation: string;
   borderRadius: string;
+  actionTypeStyles?: ActionTypeStyles;
 }
 
 interface ThemeTemplate {
@@ -90,21 +92,12 @@ const THEME_TEMPLATES: ThemeTemplate[] = [
 ];
 
 const HIGHLIGHT_ANIMATIONS = [
-  {
-    id: 'pulse',
-    name: 'Pulse',
-    description: 'Pulsação suave'
-  },
-  {
-    id: 'glow',
-    name: 'Glow',
-    description: 'Brilho radiante'
-  },
-  {
-    id: 'border',
-    name: 'Border',
-    description: 'Borda animada'
-  }
+  { id: 'pulse', name: 'Pulse', description: 'Pulsação suave' },
+  { id: 'glow', name: 'Glow', description: 'Brilho radiante' },
+  { id: 'border', name: 'Border', description: 'Borda animada' },
+  { id: 'shake', name: 'Shake', description: 'Tremor rápido' },
+  { id: 'bounce', name: 'Bounce', description: 'Quique suave' },
+  { id: 'fade', name: 'Fade', description: 'Aparece e some' },
 ];
 
 interface ThemeSelectorProps {
@@ -141,6 +134,10 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
     onChange({ ...value, highlightAnimation: animationId });
   };
 
+  const handleActionTypeStylesChange = (styles: ActionTypeStyles) => {
+    onChange({ ...value, actionTypeStyles: styles });
+  };
+
   const getHighlightStyle = (animationId: string, color: string) => {
     const baseStyle = {
       border: `3px solid ${color}`,
@@ -154,6 +151,18 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
     }
     
     return baseStyle;
+  };
+
+  const getAnimationClass = (animId: string) => {
+    switch (animId) {
+      case 'pulse': return 'animate-highlight-pulse';
+      case 'glow': return 'animate-highlight-glow';
+      case 'border': return 'animate-highlight-border';
+      case 'shake': return 'animate-highlight-shake';
+      case 'bounce': return 'animate-highlight-bounce';
+      case 'fade': return 'animate-highlight-fade';
+      default: return '';
+    }
   };
 
   return (
@@ -215,43 +224,34 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
           <Sparkles className="h-4 w-4" />
           Animação de Destaque
         </Label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {HIGHLIGHT_ANIMATIONS.map((anim) => (
             <button
               key={anim.id}
               onClick={() => handleAnimationChange(anim.id)}
               className={cn(
-                "relative p-3 rounded-lg border-2 transition-all duration-200",
+                "relative p-2 rounded-lg border-2 transition-all duration-200",
                 value.highlightAnimation === anim.id
                   ? "border-primary bg-primary/5 scale-[1.02]"
                   : "border-border hover:border-primary/50"
               )}
             >
               {/* Animated Preview */}
-              <div className="h-10 mb-2 flex items-center justify-center">
-                <div 
-                  className={cn(
-                    "w-14 h-7 rounded bg-muted/50 relative",
-                  )}
-                >
+              <div className="h-8 mb-1 flex items-center justify-center">
+                <div className="w-12 h-6 rounded bg-muted/50 relative">
                   <div 
                     className={cn(
                       "absolute inset-0 rounded pointer-events-none",
-                      anim.id === 'pulse' && "animate-highlight-pulse",
-                      anim.id === 'glow' && "animate-highlight-glow",
-                      anim.id === 'border' && "animate-highlight-border"
+                      getAnimationClass(anim.id)
                     )}
                     style={getHighlightStyle(anim.id, value.primaryColor)}
                   />
                 </div>
               </div>
-              <span className="text-xs font-medium block text-center">{anim.name}</span>
-              <span className="text-[10px] text-muted-foreground block text-center">{anim.description}</span>
+              <span className="text-[10px] font-medium block text-center">{anim.name}</span>
               
               {value.highlightAnimation === anim.id && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center animate-scale-in">
-                  <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                </div>
+                <Check className="absolute top-1 right-1 h-3 w-3 text-primary" />
               )}
             </button>
           ))}
@@ -373,9 +373,7 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
             <div 
               className={cn(
                 "absolute inset-0 rounded pointer-events-none transition-all duration-300",
-                value.highlightAnimation === 'pulse' && "animate-highlight-pulse",
-                value.highlightAnimation === 'glow' && "animate-highlight-glow",
-                value.highlightAnimation === 'border' && "animate-highlight-border"
+                getAnimationClass(value.highlightAnimation)
               )}
               style={getHighlightStyle(value.highlightAnimation, value.primaryColor)}
             />
@@ -422,6 +420,22 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Action Type Styles Editor */}
+      <div className="space-y-3">
+        <Label className="flex items-center gap-2">
+          <Layers className="h-4 w-4" />
+          Estilos por Tipo de Ação
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Configure cores e animações específicas para cada tipo de ação
+        </p>
+        <ActionTypeStyleEditor
+          value={value.actionTypeStyles || {}}
+          onChange={handleActionTypeStylesChange}
+          globalPrimaryColor={value.primaryColor}
+        />
       </div>
     </div>
   );
