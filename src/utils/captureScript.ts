@@ -422,14 +422,43 @@ export function generateCaptureScript(
     \`;
     mountTarget.appendChild(configPanel);
     
-    // CRITICAL: Add specific event listeners to all form elements to prevent host site from capturing events
-    const formElements = configPanel.querySelectorAll('input, textarea, select, button');
-    formElements.forEach(el => {
-      ['focus', 'blur', 'focusin', 'focusout', 'click', 'mousedown', 'mouseup', 
-       'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress', 'input', 'change'].forEach(eventType => {
+    // CRITICAL: Add specific event listeners to prevent host site from capturing events
+    // Different strategy for different element types
+    
+    // For inputs/textareas: block keyboard and focus events from bubbling
+    const textInputs = configPanel.querySelectorAll('input, textarea');
+    textInputs.forEach(el => {
+      ['focus', 'blur', 'focusin', 'focusout', 'keydown', 'keyup', 'keypress', 'input'].forEach(eventType => {
         el.addEventListener(eventType, (e) => {
           e.stopPropagation();
           e.stopImmediatePropagation();
+        }, true);
+      });
+      // For click events on inputs, only stopPropagation (not Immediate) to allow focus
+      ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach(eventType => {
+        el.addEventListener(eventType, (e) => {
+          e.stopPropagation();
+        }, true);
+      });
+    });
+
+    // For selects: block propagation but allow the select to work
+    const selects = configPanel.querySelectorAll('select');
+    selects.forEach(el => {
+      ['focus', 'blur', 'focusin', 'focusout', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach(eventType => {
+        el.addEventListener(eventType, (e) => {
+          e.stopPropagation();
+        }, true);
+      });
+    });
+
+    // For buttons: only stop propagation on mousedown/up to prevent host interference
+    // DO NOT use stopImmediatePropagation on click - we need our own handlers to work
+    const buttons = configPanel.querySelectorAll('button');
+    buttons.forEach(el => {
+      ['mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach(eventType => {
+        el.addEventListener(eventType, (e) => {
+          e.stopPropagation();
         }, true);
       });
     });
@@ -457,15 +486,24 @@ export function generateCaptureScript(
     // Store selected type
     let selectedType = suggestedType;
     
-    // Type selection handlers
+    // Type selection handlers - add protection against host site interference
     configPanel.querySelectorAll('.step-type-btn').forEach(btn => {
+      // Prevent host site from capturing mouse events
+      ['mousedown', 'mouseup', 'pointerdown', 'pointerup'].forEach(eventType => {
+        btn.addEventListener(eventType, (e) => {
+          e.stopPropagation();
+        }, true);
+      });
+      // Handle click with stopImmediatePropagation to ensure our handler runs
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
         selectedType = btn.dataset.type;
         configPanel.querySelectorAll('.step-type-btn').forEach(b => {
           b.style.background = b.dataset.type === selectedType ? '#3b82f6' : '#1f2937';
         });
-      });
+      }, true);
     });
     
     // Cancel handler
