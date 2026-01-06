@@ -6,14 +6,16 @@
 export function generateCaptureScript(
   token: string, 
   builderOrigin: string,
+  configurationId: string,
   apiKey: string,
   supabaseUrl: string
 ): string {
   return `
 (function() {
   // Configuration
-  const TOKEN = '${token}';
+  const CAPTURE_TOKEN = '${token}';
   const BUILDER_ORIGIN = '${builderOrigin}';
+  const CONFIGURATION_ID = '${configurationId}';
   const API_KEY = '${apiKey}';
   const SUPABASE_URL = '${supabaseUrl}';
   
@@ -221,9 +223,9 @@ export function generateCaptureScript(
     return tagName;
   }
   
-  // Send message to builder - returns { sent: boolean, copied: boolean }
+  // Send message to builder - returns { sent: boolean }
   function sendToBuilder(data) {
-    const message = { ...data, token: TOKEN };
+    const message = { ...data, token: CAPTURE_TOKEN };
     let sent = false;
     
     // Try window.opener first (works if opened via window.open)
@@ -237,15 +239,7 @@ export function generateCaptureScript(
       }
     }
     
-    // Always copy to clipboard as backup
-    const json = JSON.stringify(message, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-      console.log('[Tour Capture] JSON copiado para clipboard');
-    }).catch(() => {
-      console.log('[Tour Capture] Falha ao copiar para clipboard');
-    });
-    
-    return { sent, json };
+    return { sent };
   }
   
   // Show step configuration panel
@@ -402,7 +396,7 @@ export function generateCaptureScript(
             'x-api-key': API_KEY,
           },
           body: JSON.stringify({
-            configuration_id: TOKEN,
+            configuration_id: CONFIGURATION_ID,
             step_type: selectedType,
             selector: elementData.selector,
             title: title || 'Passo ' + (Date.now() % 1000),
@@ -438,9 +432,10 @@ export function generateCaptureScript(
       } catch (error) {
         console.error('[Tour Capture] Erro ao salvar:', error);
         
-        // Fallback: copy to clipboard
+        // Show error with JSON for manual copy
         const stepData = {
           type: 'TOUR_CAPTURE_STEP',
+          token: CAPTURE_TOKEN,
           step: {
             stepType: selectedType,
             selector: elementData.selector,
@@ -457,17 +452,29 @@ export function generateCaptureScript(
           }
         };
         
-        navigator.clipboard.writeText(JSON.stringify(stepData, null, 2)).catch(() => {});
+        const jsonStr = JSON.stringify(stepData, null, 2);
         
         configPanel.innerHTML = \`
-          <div style="text-align: center; padding: 20px;">
-            <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
-            <div style="font-weight: 600; margin-bottom: 8px;">Erro ao salvar</div>
-            <div style="font-size: 13px; color: #9ca3af; margin-bottom: 8px;">\${error.message || 'Tente novamente'}</div>
-            <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">JSON copiado para área de transferência como backup.</div>
-            <button id="step-ok" style="padding: 10px 24px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 13px;">OK</button>
+          <div style="padding: 16px;">
+            <div style="text-align: center; margin-bottom: 12px;">
+              <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">Erro ao salvar</div>
+              <div style="font-size: 12px; color: #9ca3af;">\${error.message || 'Tente novamente'}</div>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">Copie o JSON abaixo e cole no builder:</div>
+            <textarea id="step-json" readonly style="width: 100%; height: 80px; padding: 8px; border: 1px solid #374151; background: #1f2937; color: #a5b4fc; border-radius: 6px; font-size: 10px; font-family: monospace; resize: none; box-sizing: border-box;">\${jsonStr}</textarea>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button id="step-copy" style="flex: 1; padding: 8px; border: 1px solid #374151; background: #374151; color: white; border-radius: 6px; cursor: pointer; font-size: 12px;">Copiar JSON</button>
+              <button id="step-ok" style="flex: 1; padding: 8px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-size: 12px;">Fechar</button>
+            </div>
           </div>
         \`;
+        configPanel.querySelector('#step-copy').addEventListener('click', () => {
+          const textarea = configPanel.querySelector('#step-json');
+          textarea.select();
+          document.execCommand('copy');
+          configPanel.querySelector('#step-copy').textContent = 'Copiado!';
+        });
         configPanel.querySelector('#step-ok').addEventListener('click', () => {
           configPanel.remove();
           configPanel = null;
@@ -642,10 +649,11 @@ export function generateCaptureScript(
 export function generateCaptureScriptMinified(
   token: string, 
   builderOrigin: string,
+  configurationId: string,
   apiKey: string,
   supabaseUrl: string
 ): string {
-  return generateCaptureScript(token, builderOrigin, apiKey, supabaseUrl)
+  return generateCaptureScript(token, builderOrigin, configurationId, apiKey, supabaseUrl)
     .replace(/\/\/.*$/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
