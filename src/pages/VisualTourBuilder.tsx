@@ -660,7 +660,7 @@ export default function VisualTourBuilder() {
   const currentPreviewStep = state.isPreviewMode ? state.steps[state.previewStepIndex] : null;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen min-h-0 bg-background">
       {/* Header */}
       <header className="flex items-center gap-4 p-4 border-b bg-card">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
@@ -684,11 +684,11 @@ export default function VisualTourBuilder() {
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar */}
         {!state.isPreviewMode && (
-          <aside className="w-80 border-r bg-card overflow-hidden flex flex-col">
-            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings')} className="flex-1 flex flex-col">
+          <aside className="w-80 border-r bg-card overflow-hidden flex flex-col min-h-0">
+            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings')} className="flex-1 min-h-0 flex flex-col">
               <TabsList className="w-full rounded-none border-b grid grid-cols-3">
                 <TabsTrigger value="elements">Elementos</TabsTrigger>
                 <TabsTrigger value="steps">
@@ -701,7 +701,7 @@ export default function VisualTourBuilder() {
                 </TabsTrigger>
                 <TabsTrigger value="settings">Config</TabsTrigger>
               </TabsList>
-              <TabsContent value="elements" className="flex-1 overflow-hidden m-0">
+              <TabsContent value="elements" className="flex-1 min-h-0 overflow-hidden m-0">
                 <ElementsPanel
                   elements={scannedElements}
                   isLoading={isScanning}
@@ -710,7 +710,7 @@ export default function VisualTourBuilder() {
                   onScanElements={handleScanElements}
                 />
               </TabsContent>
-              <TabsContent value="steps" className="flex-1 overflow-y-auto m-0">
+              <TabsContent value="steps" className="flex-1 min-h-0 overflow-y-auto m-0">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -730,7 +730,7 @@ export default function VisualTourBuilder() {
                   </SortableContext>
                 </DndContext>
               </TabsContent>
-              <TabsContent value="settings" className="flex-1 overflow-y-auto m-0">
+              <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto m-0">
                 {configuration && (
                   <SettingsPanel
                     configuration={configuration}
@@ -764,7 +764,7 @@ export default function VisualTourBuilder() {
 
         {/* Config Panel (conditionally shown) */}
         {showConfigPanel && !state.isPreviewMode && (
-          <aside className="w-96 border-l bg-card overflow-y-auto">
+          <aside className="w-96 border-l bg-card overflow-y-auto min-h-0">
             <StepConfigPanel
               selectedElement={state.selectedElement}
               editingStep={editingStep || null}
