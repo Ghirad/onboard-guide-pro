@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { IframeContainer } from '@/components/visual-builder/IframeContainer';
+import { IframeContainer, IframeContainerRef } from '@/components/visual-builder/IframeContainer';
 import { StepConfigPanel } from '@/components/visual-builder/StepConfigPanel';
 import { TourTimeline } from '@/components/visual-builder/TourTimeline';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
@@ -42,6 +42,8 @@ export default function VisualTourBuilder() {
   const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements'>('elements');
+  
+  const iframeContainerRef = useRef<IframeContainerRef>(null);
 
   // Sync steps from database
   useEffect(() => {
@@ -144,11 +146,9 @@ export default function VisualTourBuilder() {
   const handleScanElements = useCallback(() => {
     setIsScanning(true);
     setScannedElements([]);
-    // The IframeContainer will handle sending the SCAN_ELEMENTS message
-    // We need to trigger it by calling a method - for now we'll rely on the auto-scan
-    // This will be enhanced when we add a ref to IframeContainer
-    if (iframeReady) {
-      window.postMessage({ type: 'TRIGGER_SCAN' }, '*');
+    // Use ref to trigger scan in iframe
+    if (iframeReady && iframeContainerRef.current) {
+      iframeContainerRef.current.scanElements();
     }
   }, [iframeReady]);
 
@@ -407,6 +407,7 @@ export default function VisualTourBuilder() {
         {/* Iframe Preview */}
         <main className={`flex-1 p-4 ${state.isPreviewMode ? 'pb-32' : ''}`}>
           <IframeContainer
+            ref={iframeContainerRef}
             proxyUrl={proxyUrl}
             isSelectionMode={state.isSelectionMode}
             onElementSelected={handleElementSelected}

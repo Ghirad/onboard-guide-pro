@@ -40,7 +40,6 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
   const [showDebug, setShowDebug] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const scriptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const addDebugLog = useCallback((message: string, data?: unknown) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -79,15 +78,20 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
       addDebugLog(`Received: ${event.data.type}`);
       
       if (event.data.type === 'IFRAME_READY') {
+        // Clear any pending timeouts
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        
+        // Check if there's an error from the proxy
+        if (event.data.error) {
+          addDebugLog(`Proxy error: ${event.data.error}`);
+          setLoadingState('error');
+          setErrorMessage(event.data.error);
+          return;
+        }
+        
         isReadyRef.current = true;
         setLoadingState('ready');
         setErrorMessage(null);
-        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-        if (scriptTimeoutRef.current) clearTimeout(scriptTimeoutRef.current);
-        
-        if (event.data.error) {
-          addDebugLog(`Script error: ${event.data.error}`);
-        }
         
         onIframeReady();
         // Auto-scan elements when iframe is ready
@@ -185,9 +189,9 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
       setDebugInfo([]);
       isReadyRef.current = false;
 
-      // Set a timeout for initial load (longer for SPAs)
+      // Set a timeout for entire load process (30s for SPAs)
       loadTimeoutRef.current = setTimeout(() => {
-        if (!isReadyRef.current && loadingState !== 'error') {
+        if (!isReadyRef.current) {
           addDebugLog('Load timeout reached (30s)');
           setLoadingState('error');
           setErrorMessage('A página demorou muito para carregar. Verifique se a URL está correta e acessível.');
@@ -197,23 +201,16 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
 
     return () => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-      if (scriptTimeoutRef.current) clearTimeout(scriptTimeoutRef.current);
     };
   }, [proxyUrl, addDebugLog]);
 
   const handleIframeLoad = useCallback(() => {
     addDebugLog('Iframe onload fired');
-    setLoadingState('waiting_script');
-    
-    // Wait for the injection script to send IFRAME_READY
-    // Longer timeout for React/SPA sites that need hydration time
-    scriptTimeoutRef.current = setTimeout(() => {
-      if (!isReadyRef.current) {
-        addDebugLog('Script timeout - IFRAME_READY not received after 15s');
-        setLoadingState('error');
-        setErrorMessage('O script de comunicação não respondeu. Isso pode acontecer com sites React/SPA que bloqueiam scripts externos.');
-      }
-    }, 15000);
+    // Don't set waiting_script - the script sends IFRAME_READY immediately now
+    // Just update to loading state if we haven't received IFRAME_READY yet
+    if (!isReadyRef.current) {
+      setLoadingState('loading');
+    }
   }, [addDebugLog]);
 
   const handleRetry = () => {
@@ -244,19 +241,22 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
 
   const loadingMessages: Record<LoadingState, { title: string; subtitle: string }> = {
     connecting: { title: 'Conectando ao proxy...', subtitle: 'Iniciando conexão' },
-    loading: { title: 'Carregando página...', subtitle: 'Buscando conteúdo' },
-    waiting_script: { title: 'Aguardando comunicação...', subtitle: 'Inicializando script' },
+    loading: { title: 'Carregando página...', subtitle: 'Aguardando resposta' },
+    waiting_script: { title: 'Inicializando...', subtitle: 'Aguardando script' },
     ready: { title: '', subtitle: '' },
     error: { title: '', subtitle: '' },
   };
+
+  // Show iframe even during loading (with overlay) so user sees progress
+  const showIframe = proxyUrl && loadingState !== 'error';
 
   return (
     <div className="relative w-full h-full bg-muted/20 rounded-lg overflow-hidden border">
       {proxyUrl ? (
         <>
-          {/* Loading Overlay */}
+          {/* Loading Overlay - show over iframe */}
           {(loadingState === 'connecting' || loadingState === 'loading' || loadingState === 'waiting_script') && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
               <p className="text-sm text-muted-foreground">{loadingMessages[loadingState].title}</p>
               <p className="text-xs text-muted-foreground mt-1">{loadingMessages[loadingState].subtitle}</p>
@@ -331,15 +331,20 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
             </div>
           )}
 
-          <iframe
-            ref={iframeRef}
-            src={proxyUrl}
-            className={`w-full h-full border-0 ${loadingState !== 'ready' ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title="Visual Builder Preview"
-          />
+          {/* Iframe - visible during loading with reduced opacity */}
+          {showIframe && (
+            <iframe
+              ref={iframeRef}
+              src={proxyUrl}
+              className={`w-full h-full border-0 transition-opacity duration-300 ${
+                loadingState === 'ready' ? 'opacity-100' : 'opacity-30'
+              }`}
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              title="Visual Builder Preview"
+            />
+          )}
         </>
       ) : (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
