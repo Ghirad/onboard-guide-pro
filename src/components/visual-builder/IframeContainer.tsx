@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ExternalLink, Info } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ExternalLink, MousePointer, Type, Eye, Clock, Sparkles, LayoutTemplate, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { SelectedElement, TourStep } from '@/types/visualBuilder';
 import { ScannedElement } from './ElementsPanel';
 interface IframeContainerProps {
@@ -209,19 +210,24 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
     }
   }, [url]);
 
-  // Auto-switch to proxy mode when preview is activated
+  // Keep iframe mode consistent with prop (don't auto-switch on preview to avoid reload issues)
   useEffect(() => {
-    if (isPreviewMode && iframeMode === 'direct') {
-      console.log('[IframeContainer] Switching to proxy mode for preview');
-      setIframeMode('proxy');
-      setLoadingState('loading');
-    } else if (!isPreviewMode && mode === 'direct' && iframeMode === 'proxy') {
-      // Only switch back if original mode was direct
-      console.log('[IframeContainer] Switching back to direct mode');
-      setIframeMode('direct');
-      setLoadingState('loading');
+    if (mode !== iframeMode) {
+      setIframeMode(mode);
     }
-  }, [isPreviewMode, iframeMode, mode]);
+  }, [mode, iframeMode]);
+
+  // Step type icons
+  const getStepIcon = (type?: string) => {
+    switch (type) {
+      case 'click': return <MousePointer className="h-4 w-4" />;
+      case 'input': return <Type className="h-4 w-4" />;
+      case 'highlight': return <Sparkles className="h-4 w-4" />;
+      case 'wait': return <Clock className="h-4 w-4" />;
+      case 'modal': return <LayoutTemplate className="h-4 w-4" />;
+      default: return <Eye className="h-4 w-4" />;
+    }
+  };
 
   const handleIframeLoad = useCallback(() => {
     // For direct mode, mark as ready on load
@@ -296,10 +302,74 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
           )}
 
 
+          {/* Preview Overlay for Direct Mode - shows step info over the iframe */}
+          {isPreviewMode && previewStep && loadingState === 'ready' && iframeMode === 'direct' && (
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {/* Semi-transparent backdrop */}
+              <div className="absolute inset-0 bg-black/5" />
+              
+              {/* Step info card */}
+              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
+                <Card className="w-80 shadow-2xl border-primary/20">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Step type badge */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                        {getStepIcon(previewStep.type)}
+                        <span className="capitalize">{previewStep.type || 'tooltip'}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        Passo {previewStepIndex + 1} de {totalSteps}
+                      </span>
+                    </div>
+                    
+                    {/* Title */}
+                    <h4 className="font-semibold text-base">
+                      {previewStep.config.title || 'Sem título'}
+                    </h4>
+                    
+                    {/* Description */}
+                    {previewStep.config.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {previewStep.config.description}
+                      </p>
+                    )}
+                    
+                    {/* Image preview */}
+                    {previewStep.config.imageUrl && (
+                      <div className="rounded-lg overflow-hidden border bg-muted/50">
+                        <img 
+                          src={previewStep.config.imageUrl} 
+                          alt="Step preview" 
+                          className="w-full h-24 object-cover"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Selector info */}
+                    {previewStep.selector && (
+                      <div className="space-y-1">
+                        <span className="text-xs text-muted-foreground">Elemento alvo:</span>
+                        <code className="block text-xs font-mono bg-muted p-2 rounded border overflow-x-auto">
+                          {previewStep.selector}
+                        </code>
+                      </div>
+                    )}
+
+                    {/* Note about preview limitation */}
+                    <p className="text-xs text-muted-foreground italic border-t pt-2">
+                      Preview visual. O destaque do elemento será visível na execução real do tour.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
           {/* Proxy Mode Info Banner */}
           {loadingState === 'ready' && iframeMode === 'proxy' && isPreviewMode && (
             <div className="absolute top-2 left-2 right-2 z-10 flex items-center gap-2 px-3 py-2 bg-primary/10 backdrop-blur-sm rounded-lg text-xs">
-              <Info className="h-4 w-4 text-primary flex-shrink-0" />
+              <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
               <span className="text-foreground">
                 <strong>Preview ativo</strong> - Navegue pelo tour usando os controles abaixo.
               </span>
@@ -320,34 +390,52 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
             />
           )}
 
-          {/* Preview Controls Bar - tooltip/highlight rendered inside iframe by proxy */}
+          {/* Preview Controls Bar */}
           {isPreviewMode && previewStep && loadingState === 'ready' && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-              <div className="flex items-center gap-3 px-4 py-3 bg-background/95 backdrop-blur-sm rounded-full shadow-lg border">
-                <span className="text-sm text-muted-foreground">
-                  Passo {previewStepIndex + 1} de {totalSteps}
-                </span>
-                <div className="h-4 w-px bg-border" />
-                <button
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-background/95 backdrop-blur-sm rounded-full shadow-lg border">
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onPreviewAction?.('prev')}
                   disabled={previewStepIndex === 0}
-                  className="px-3 py-1 text-sm rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 px-2"
                 >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
                   Anterior
-                </button>
-                <button
+                </Button>
+                
+                <div className="flex items-center gap-1 px-3">
+                  {Array.from({ length: totalSteps }, (_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i === previewStepIndex ? 'bg-primary' : 'bg-muted-foreground/30'
+                      }`}
+                    />
+                  ))}
+                </div>
+                
+                <Button
+                  variant="default"
+                  size="sm"
                   onClick={() => onPreviewAction?.('next')}
-                  className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                  className="h-8 px-2"
                 >
                   {previewStepIndex === totalSteps - 1 ? 'Finalizar' : 'Próximo'}
-                </button>
-                <div className="h-4 w-px bg-border" />
-                <button
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+                
+                <div className="h-4 w-px bg-border mx-1" />
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onPreviewAction?.('exit')}
-                  className="px-3 py-1 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                  className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  Sair
-                </button>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           )}
