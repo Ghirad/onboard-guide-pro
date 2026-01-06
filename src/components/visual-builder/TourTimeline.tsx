@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, MessageSquare, Type, Sparkles, MousePointer, Keyboard, Clock } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Eye, MessageSquare, Type, Sparkles, MousePointer, Keyboard, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TourStep, TourStepType } from '@/types/visualBuilder';
 
@@ -9,6 +9,7 @@ interface TourTimelineProps {
   onEditStep: (step: TourStep) => void;
   onDeleteStep: (stepId: string) => void;
   onHoverStep: (selector: string | null) => void;
+  onPreviewStep?: (step: TourStep) => void;
 }
 
 const stepTypeIcons: Record<TourStepType, React.ReactNode> = {
@@ -24,11 +25,12 @@ interface SortableStepProps {
   step: TourStep;
   onEdit: () => void;
   onDelete: () => void;
+  onPreview?: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 }
 
-function SortableStep({ step, onEdit, onDelete, onMouseEnter, onMouseLeave }: SortableStepProps) {
+function SortableStep({ step, onEdit, onDelete, onPreview, onMouseEnter, onMouseLeave }: SortableStepProps) {
   const {
     attributes,
     listeners,
@@ -74,10 +76,15 @@ function SortableStep({ step, onEdit, onDelete, onMouseEnter, onMouseLeave }: So
       </div>
 
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" onClick={onEdit}>
+        {onPreview && (
+          <Button variant="ghost" size="icon" onClick={onPreview} title="Preview">
+            <Eye className="h-4 w-4 text-primary" />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon" onClick={onEdit} title="Editar">
           <Pencil className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onDelete}>
+        <Button variant="ghost" size="icon" onClick={onDelete} title="Remover">
           <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       </div>
@@ -90,6 +97,7 @@ export function TourTimeline({
   onEditStep,
   onDeleteStep,
   onHoverStep,
+  onPreviewStep,
 }: TourTimelineProps) {
   if (steps.length === 0) {
     return (
@@ -115,6 +123,7 @@ export function TourTimeline({
             step={step}
             onEdit={() => onEditStep(step)}
             onDelete={() => onDeleteStep(step.id)}
+            onPreview={onPreviewStep ? () => onPreviewStep(step) : undefined}
             onMouseEnter={() => onHoverStep(step.selector)}
             onMouseLeave={() => onHoverStep(null)}
           />
