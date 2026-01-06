@@ -34,7 +34,7 @@ export function generateCaptureScript(
     pointer-events: none;
     border: 2px solid #3b82f6;
     background: rgba(59, 130, 246, 0.1);
-    z-index: 999999;
+    z-index: 2147483640;
     transition: all 0.15s ease;
     border-radius: 4px;
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
@@ -52,7 +52,7 @@ export function generateCaptureScript(
     border-radius: 6px;
     font-size: 12px;
     font-family: system-ui, sans-serif;
-    z-index: 1000000;
+    z-index: 2147483641;
     pointer-events: none;
     max-width: 300px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -135,7 +135,7 @@ export function generateCaptureScript(
     border-radius: 8px;
     font-size: 13px;
     font-family: system-ui, sans-serif;
-    z-index: 1000001;
+    z-index: 2147483644;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   \`;
   document.body.appendChild(panel);
@@ -332,6 +332,23 @@ export function generateCaptureScript(
       </div>
     \`;
     
+    // Create backdrop to block interaction with page behind
+    let backdrop = document.getElementById('tour-config-backdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'tour-config-backdrop';
+      backdrop.style.cssText = \`
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 2147483645;
+      \`;
+      document.body.appendChild(backdrop);
+    }
+    
     configPanel.style.cssText = \`
       position: fixed;
       top: 50%;
@@ -342,12 +359,18 @@ export function generateCaptureScript(
       padding: 16px;
       border-radius: 12px;
       font-family: system-ui, sans-serif;
-      z-index: 1000002;
+      z-index: 2147483646;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
       width: 340px;
       max-width: 90vw;
     \`;
     document.body.appendChild(configPanel);
+    
+    // Focus the title input after appending
+    setTimeout(() => {
+      const titleInput = configPanel.querySelector('#step-title');
+      if (titleInput) titleInput.focus();
+    }, 100);
     
     // Pause capture while config is open
     isActive = false;
@@ -371,6 +394,8 @@ export function generateCaptureScript(
     // Cancel handler
     configPanel.querySelector('#step-cancel').addEventListener('click', (e) => {
       e.stopPropagation();
+      const backdrop = document.getElementById('tour-config-backdrop');
+      if (backdrop) backdrop.remove();
       configPanel.remove();
       configPanel = null;
       isActive = true;
@@ -422,6 +447,8 @@ export function generateCaptureScript(
           \`;
           
           setTimeout(() => {
+            const backdrop = document.getElementById('tour-config-backdrop');
+            if (backdrop) backdrop.remove();
             configPanel.remove();
             configPanel = null;
             isActive = true;
@@ -476,6 +503,8 @@ export function generateCaptureScript(
           configPanel.querySelector('#step-copy').textContent = 'Copiado!';
         });
         configPanel.querySelector('#step-ok').addEventListener('click', () => {
+          const backdrop = document.getElementById('tour-config-backdrop');
+          if (backdrop) backdrop.remove();
           configPanel.remove();
           configPanel = null;
           isActive = true;
