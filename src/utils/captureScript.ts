@@ -422,6 +422,27 @@ export function generateCaptureScript(
     \`;
     mountTarget.appendChild(configPanel);
     
+    // CRITICAL: Add specific event listeners to all form elements to prevent host site from capturing events
+    const formElements = configPanel.querySelectorAll('input, textarea, select, button');
+    formElements.forEach(el => {
+      ['focus', 'blur', 'focusin', 'focusout', 'click', 'mousedown', 'mouseup', 
+       'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress', 'input', 'change'].forEach(eventType => {
+        el.addEventListener(eventType, (e) => {
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+        }, true);
+      });
+    });
+    
+    // Global listener to prevent focus trap from host site modals (MuiModal, etc.)
+    const focusTrapHandler = (e) => {
+      if (configPanel && configPanel.contains(e.target)) {
+        e.stopImmediatePropagation();
+      }
+    };
+    document.addEventListener('focusin', focusTrapHandler, true);
+    configPanel._focusTrapHandler = focusTrapHandler;
+    
     // Focus the title input after appending
     setTimeout(() => {
       const titleInput = configPanel.querySelector('#step-title');
@@ -450,6 +471,10 @@ export function generateCaptureScript(
     // Cancel handler
     configPanel.querySelector('#step-cancel').addEventListener('click', (e) => {
       e.stopPropagation();
+      // Remove focus trap listener
+      if (configPanel._focusTrapHandler) {
+        document.removeEventListener('focusin', configPanel._focusTrapHandler, true);
+      }
       const backdrop = document.getElementById('tour-config-backdrop');
       if (backdrop) backdrop.remove();
       configPanel.remove();
@@ -503,6 +528,10 @@ export function generateCaptureScript(
           \`;
           
           setTimeout(() => {
+            // Remove focus trap listener
+            if (configPanel._focusTrapHandler) {
+              document.removeEventListener('focusin', configPanel._focusTrapHandler, true);
+            }
             const backdrop = document.getElementById('tour-config-backdrop');
             if (backdrop) backdrop.remove();
             configPanel.remove();
@@ -559,6 +588,10 @@ export function generateCaptureScript(
           configPanel.querySelector('#step-copy').textContent = 'Copiado!';
         });
         configPanel.querySelector('#step-ok').addEventListener('click', () => {
+          // Remove focus trap listener
+          if (configPanel._focusTrapHandler) {
+            document.removeEventListener('focusin', configPanel._focusTrapHandler, true);
+          }
           const backdrop = document.getElementById('tour-config-backdrop');
           if (backdrop) backdrop.remove();
           configPanel.remove();
