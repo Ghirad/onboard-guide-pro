@@ -153,11 +153,10 @@ const widgetScript = `
     _fetchConfiguration: function() {
       var self = this;
       var baseUrl = 'https://ukjpxeptefznpwduwled.supabase.co';
-      var url = baseUrl + '/functions/v1/get-configuration?configId=' + this._config.configId;
+      var url = baseUrl + '/functions/v1/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey);
       
       return fetch(url, {
         headers: {
-          'Authorization': 'Bearer ' + this._config.apiKey,
           'Content-Type': 'application/json'
         }
       })
