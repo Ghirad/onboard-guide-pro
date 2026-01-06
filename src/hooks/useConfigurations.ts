@@ -263,6 +263,7 @@ export function useUpdateStep() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["steps", result.configurationId] });
+      queryClient.invalidateQueries({ queryKey: ["steps-with-actions", result.configurationId] });
     },
   });
 }
@@ -327,6 +328,7 @@ export function useCreateAction() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["actions", result.stepId] });
+      queryClient.invalidateQueries({ queryKey: ["steps-with-actions"] });
     },
   });
 }
@@ -351,6 +353,7 @@ export function useUpdateAction() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["actions", result.stepId] });
+      queryClient.invalidateQueries({ queryKey: ["steps-with-actions"] });
     },
   });
 }
@@ -370,6 +373,7 @@ export function useDeleteAction() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["actions", result.stepId] });
+      queryClient.invalidateQueries({ queryKey: ["steps-with-actions"] });
     },
   });
 }

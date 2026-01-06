@@ -14,7 +14,7 @@ import { ElementsPanel, ScannedElement } from '@/components/visual-builder/Eleme
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
 import { StepPreviewModal } from '@/components/visual-builder/StepPreviewModal';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
-import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
+import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
 import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,6 +37,7 @@ export default function VisualTourBuilder() {
   const updateStep = useUpdateStep();
   const deleteStep = useDeleteStep();
   const createAction = useCreateAction();
+  const updateAction = useUpdateAction();
 
   // Helper to derive TourStepType from database step + actions
   const deriveStepType = (step: SetupStepWithActions): TourStepType => {
@@ -463,6 +464,7 @@ export default function VisualTourBuilder() {
 
   const handleUpdateStep = async (stepId: string, updates: Partial<TourStep>) => {
     try {
+      // Update step fields
       await updateStep.mutateAsync({
         id: stepId,
         configurationId: id!,
@@ -471,6 +473,39 @@ export default function VisualTourBuilder() {
         target_selector: updates.selector,
         target_type: updates.type === 'modal' ? 'modal' : 'page',
       });
+
+      // Also update associated action if type requires it
+      const actionTypes = ['click', 'input', 'wait', 'highlight'];
+      const stepWithActions = dbStepsWithActions?.find(s => s.id === stepId);
+      const firstAction = stepWithActions?.step_actions?.[0];
+
+      if (updates.type && actionTypes.includes(updates.type)) {
+        if (firstAction) {
+          // Update existing action
+          await updateAction.mutateAsync({
+            id: firstAction.id,
+            stepId,
+            action_type: updates.type as 'click' | 'input' | 'wait' | 'highlight',
+            selector: updates.selector || firstAction.selector,
+            delay_ms: updates.config?.delayMs ?? firstAction.delay_ms,
+            highlight_color: updates.config?.highlightColor || firstAction.highlight_color,
+            highlight_animation: updates.config?.highlightAnimation || firstAction.highlight_animation,
+          });
+        } else {
+          // Create new action
+          await createAction.mutateAsync({
+            stepId,
+            action: {
+              action_type: updates.type as 'click' | 'input' | 'wait' | 'highlight',
+              selector: updates.selector || '',
+              action_order: 0,
+              delay_ms: updates.config?.delayMs || 0,
+              highlight_color: updates.config?.highlightColor || '#ff9f0d',
+              highlight_animation: updates.config?.highlightAnimation || 'pulse',
+            },
+          });
+        }
+      }
 
       toast({
         title: 'Passo atualizado',
