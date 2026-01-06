@@ -151,16 +151,37 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   function sendToBuilder(data) {
     const message = { ...data, token: TOKEN };
     
+    // Try window.opener first (works if opened via window.open)
     if (window.opener) {
-      window.opener.postMessage(message, BUILDER_ORIGIN);
-      console.log('[Tour Capture] Sent to builder:', data.type);
-    } else {
-      // Fallback: copy to clipboard
-      const json = JSON.stringify(message, null, 2);
-      navigator.clipboard.writeText(json).then(() => {
-        alert('Selector copiado para clipboard!\\n\\nCole no builder para adicionar o passo.');
-      });
+      try {
+        window.opener.postMessage(message, BUILDER_ORIGIN);
+        console.log('[Tour Capture] Enviado para builder:', data.type);
+        return;
+      } catch (e) {
+        console.log('[Tour Capture] postMessage falhou, usando fallback');
+      }
     }
+    
+    // Try BroadcastChannel as second option
+    try {
+      const channel = new BroadcastChannel('tour-builder-capture');
+      channel.postMessage(message);
+      channel.close();
+      console.log('[Tour Capture] Enviado via BroadcastChannel:', data.type);
+      return;
+    } catch (e) {
+      console.log('[Tour Capture] BroadcastChannel não suportado');
+    }
+    
+    // Final fallback: copy to clipboard with clear instructions
+    const json = JSON.stringify(message, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      alert('📋 Elemento copiado!\\n\\n1. Volte para o Tour Builder\\n2. Cole no campo "Importar Manualmente"\\n3. Clique em "Importar Elemento"');
+    }).catch(() => {
+      console.log('[Tour Capture] Clipboard também falhou, exibindo no console');
+      console.log('Copie o JSON abaixo e cole no campo "Importar" do builder:');
+      console.log(json);
+    });
   }
   
   // Update overlay position
