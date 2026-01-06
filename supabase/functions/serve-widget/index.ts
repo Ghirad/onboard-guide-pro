@@ -28,8 +28,15 @@ const widgetScript = `
         position: options.position || 'top-bar',
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
-        actionDelay: options.actionDelay || 300
+        actionDelay: options.actionDelay || 300,
+        allowedRoutes: options.allowedRoutes || []
       };
+
+      // Check if widget should show on current route
+      if (!this._shouldShowOnCurrentRoute()) {
+        console.log('[AutoSetup] Widget not configured for this route:', window.location.pathname);
+        return this;
+      }
 
       this._loadProgress();
       this._fetchConfiguration().then(function() {
@@ -45,6 +52,35 @@ const widgetScript = `
       }.bind(this));
 
       return this;
+    },
+
+    _shouldShowOnCurrentRoute: function() {
+      var routes = this._config.allowedRoutes;
+      
+      // If no routes specified, show on all pages
+      if (!routes || routes.length === 0) return true;
+      
+      var currentPath = window.location.pathname.toLowerCase();
+      
+      for (var i = 0; i < routes.length; i++) {
+        var route = routes[i].toLowerCase();
+        
+        // Wildcard support: /painel/*
+        if (route.endsWith('/*')) {
+          var prefix = route.slice(0, -1); // Remove the *
+          if (currentPath.startsWith(prefix)) return true;
+        } 
+        // Exact match (with or without trailing slash)
+        else {
+          if (currentPath === route || 
+              currentPath === route + '/' ||
+              currentPath + '/' === route) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
     },
 
     start: function() {

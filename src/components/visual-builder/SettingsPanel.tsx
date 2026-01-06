@@ -21,6 +21,9 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
   const [widgetPosition, setWidgetPosition] = useState(configuration.widget_position || 'bottom-right');
   const [autoStart, setAutoStart] = useState(configuration.auto_start ?? true);
   const [isActive, setIsActive] = useState(configuration.is_active ?? true);
+  const [allowedRoutes, setAllowedRoutes] = useState<string[]>(
+    (configuration as any).allowed_routes || []
+  );
 
   // Sync state when configuration changes
   useEffect(() => {
@@ -30,6 +33,7 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     setWidgetPosition(configuration.widget_position || 'bottom-right');
     setAutoStart(configuration.auto_start ?? true);
     setIsActive(configuration.is_active ?? true);
+    setAllowedRoutes((configuration as any).allowed_routes || []);
   }, [configuration]);
 
   const handleSave = () => {
@@ -40,16 +44,19 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
       widget_position: widgetPosition,
       auto_start: autoStart,
       is_active: isActive,
-    });
+      allowed_routes: allowedRoutes,
+    } as any);
   };
 
+  const currentAllowedRoutes = (configuration as any).allowed_routes || [];
   const hasChanges = 
     name !== configuration.name ||
     description !== (configuration.description || '') ||
     targetUrl !== configuration.target_url ||
     widgetPosition !== (configuration.widget_position || 'bottom-right') ||
     autoStart !== (configuration.auto_start ?? true) ||
-    isActive !== (configuration.is_active ?? true);
+    isActive !== (configuration.is_active ?? true) ||
+    JSON.stringify(allowedRoutes) !== JSON.stringify(currentAllowedRoutes);
 
   return (
     <div className="p-4 space-y-6">
@@ -131,6 +138,22 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
             checked={isActive}
             onCheckedChange={setIsActive}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="allowed-routes">Rotas Permitidas</Label>
+          <Textarea
+            id="allowed-routes"
+            value={allowedRoutes.join('\n')}
+            onChange={(e) => setAllowedRoutes(
+              e.target.value.split('\n').map(r => r.trim()).filter(r => r)
+            )}
+            placeholder="/Painel&#10;/dashboard/*&#10;/app/settings"
+            rows={4}
+          />
+          <p className="text-xs text-muted-foreground">
+            Uma rota por linha. Use * para wildcards (ex: /painel/*). Deixe vazio para todas as páginas.
+          </p>
         </div>
       </div>
 
