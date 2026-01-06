@@ -38,7 +38,7 @@ export default function Dashboard() {
       description: "Descrição da configuração",
       target_url: "https://exemplo.com",
     });
-    navigate(`/config/${result.id}`);
+    navigate(`/config/${result.id}/visual-builder`);
   };
 
   return (
@@ -89,7 +89,7 @@ export default function Dashboard() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link to={`/config/${config.id}`}>
+                          <Link to={`/config/${config.id}/visual-builder`}>
                             <Settings className="mr-2 h-4 w-4" />
                             Editar
                           </Link>
@@ -147,7 +147,7 @@ export default function Dashboard() {
                     </div>
 
                     <Button asChild variant="outline" className="w-full">
-                      <Link to={`/config/${config.id}`}>
+                      <Link to={`/config/${config.id}/visual-builder`}>
                         <Settings className="mr-2 h-4 w-4" />
                         Configurar
                       </Link>
