@@ -35,7 +35,8 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     backgroundColor: (configuration as any).theme_background_color || '#ffffff',
     textColor: (configuration as any).theme_text_color || '#1f2937',
     highlightAnimation: (configuration as any).theme_highlight_animation || 'pulse',
-    borderRadius: (configuration as any).theme_border_radius || 'rounded'
+    borderRadius: (configuration as any).theme_border_radius || 'rounded',
+    actionTypeStyles: (configuration as any).action_type_styles || {}
   });
 
   // Sync state when configuration changes
@@ -54,7 +55,8 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
       backgroundColor: (configuration as any).theme_background_color || '#ffffff',
       textColor: (configuration as any).theme_text_color || '#1f2937',
       highlightAnimation: (configuration as any).theme_highlight_animation || 'pulse',
-      borderRadius: (configuration as any).theme_border_radius || 'rounded'
+      borderRadius: (configuration as any).theme_border_radius || 'rounded',
+      actionTypeStyles: (configuration as any).action_type_styles || {}
     });
   }, [configuration]);
 
@@ -74,10 +76,12 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
       theme_text_color: theme.textColor,
       theme_highlight_animation: theme.highlightAnimation,
       theme_border_radius: theme.borderRadius,
+      action_type_styles: theme.actionTypeStyles,
     } as any);
   };
 
   const currentAllowedRoutes = (configuration as any).allowed_routes || [];
+  const currentActionTypeStyles = (configuration as any).action_type_styles || {};
   const hasChanges = 
     name !== configuration.name ||
     description !== (configuration.description || '') ||
@@ -92,7 +96,8 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     theme.backgroundColor !== ((configuration as any).theme_background_color || '#ffffff') ||
     theme.textColor !== ((configuration as any).theme_text_color || '#1f2937') ||
     theme.highlightAnimation !== ((configuration as any).theme_highlight_animation || 'pulse') ||
-    theme.borderRadius !== ((configuration as any).theme_border_radius || 'rounded');
+    theme.borderRadius !== ((configuration as any).theme_border_radius || 'rounded') ||
+    JSON.stringify(theme.actionTypeStyles) !== JSON.stringify(currentActionTypeStyles);
 
   return (
     <div className="h-full flex flex-col">
