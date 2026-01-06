@@ -103,6 +103,9 @@ export default function VisualTourBuilder() {
         // Get selector from step or first action
         const selector = step.target_selector || firstAction?.selector || '';
         
+        // Parse theme_override from database
+        const themeOverride = (step as any).theme_override || undefined;
+        
         return {
           id: step.id,
           order: step.step_order,
@@ -123,6 +126,7 @@ export default function VisualTourBuilder() {
             delayMs: firstAction?.delay_ms || undefined,
             highlightColor: firstAction?.highlight_color || undefined,
             highlightAnimation: firstAction?.highlight_animation || undefined,
+            themeOverride,
           },
         };
       });
@@ -429,7 +433,8 @@ export default function VisualTourBuilder() {
           target_selector: stepData.selector,
           step_order: newOrder,
           is_required: true,
-        },
+          theme_override: stepData.config.themeOverride?.enabled ? stepData.config.themeOverride : null,
+        } as any,
       });
       
       // Create step_action for action types
@@ -475,7 +480,8 @@ export default function VisualTourBuilder() {
         description: updates.config?.description,
         target_selector: updates.selector,
         target_type: updates.type === 'modal' ? 'modal' : 'page',
-      });
+        theme_override: updates.config?.themeOverride?.enabled ? updates.config.themeOverride : null,
+      } as any);
 
       // Also update associated action if type requires it
       const actionTypes = ['click', 'input', 'wait', 'highlight'];

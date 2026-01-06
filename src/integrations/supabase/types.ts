@@ -126,6 +126,7 @@ export type Database = {
           target_selector: string | null
           target_type: Database["public"]["Enums"]["step_target_type"]
           target_url: string | null
+          theme_override: Json | null
           tips: string | null
           title: string
           updated_at: string
@@ -142,6 +143,7 @@ export type Database = {
           target_selector?: string | null
           target_type?: Database["public"]["Enums"]["step_target_type"]
           target_url?: string | null
+          theme_override?: Json | null
           tips?: string | null
           title: string
           updated_at?: string
@@ -158,6 +160,7 @@ export type Database = {
           target_selector?: string | null
           target_type?: Database["public"]["Enums"]["step_target_type"]
           target_url?: string | null
+          theme_override?: Json | null
           tips?: string | null
           title?: string
           updated_at?: string

@@ -24,6 +24,15 @@ export interface TourStep {
   config: TourStepConfig;
 }
 
+export interface StepThemeOverride {
+  enabled?: boolean;
+  primaryColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  animation?: 'pulse' | 'glow' | 'border' | 'shake' | 'bounce' | 'fade';
+  borderRadius?: 'none' | 'sm' | 'rounded' | 'lg' | 'xl';
+}
+
 export interface TourStepConfig {
   title?: string;
   description?: string;
@@ -37,6 +46,7 @@ export interface TourStepConfig {
   waitForClick?: boolean;
   inputPlaceholder?: string;
   delayMs?: number;
+  themeOverride?: StepThemeOverride;
 }
 
 export interface VisualBuilderState {

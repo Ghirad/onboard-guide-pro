@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Type, MessageSquare, Sparkles, MousePointer, Keyboard, Clock, Lightbulb } from 'lucide-react';
+import { X, Type, MessageSquare, Sparkles, MousePointer, Keyboard, Clock, Lightbulb, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { SelectedElement, TourStep, TourStepType, TourStepConfig, TooltipPosition } from '@/types/visualBuilder';
+import { SelectedElement, TourStep, TourStepType, TourStepConfig, TooltipPosition, StepThemeOverride } from '@/types/visualBuilder';
 
 interface StepConfigPanelProps {
   selectedElement: SelectedElement | null;
@@ -193,9 +193,13 @@ export function StepConfigPanel({
 
         {/* Type-specific Configuration */}
         <Tabs defaultValue="content" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="content">Conteúdo</TabsTrigger>
             <TabsTrigger value="appearance">Aparência</TabsTrigger>
+            <TabsTrigger value="theme" className="flex items-center gap-1">
+              <Palette className="h-3 w-3" />
+              Tema
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="content" className="space-y-4 mt-4">
@@ -405,6 +409,175 @@ export function StepConfigPanel({
                   </div>
                 </div>
               </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="theme" className="space-y-4 mt-4">
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div>
+                <Label htmlFor="enableTheme">Tema Personalizado</Label>
+                <p className="text-xs text-muted-foreground">
+                  Sobrescrever o tema global para este passo
+                </p>
+              </div>
+              <Switch
+                id="enableTheme"
+                checked={config.themeOverride?.enabled ?? false}
+                onCheckedChange={(checked) => {
+                  updateConfig('themeOverride', {
+                    ...config.themeOverride,
+                    enabled: checked,
+                  });
+                }}
+              />
+            </div>
+
+            {config.themeOverride?.enabled && (
+              <div className="space-y-4 p-3 border rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="themePrimaryColor">Cor Principal</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="themePrimaryColor"
+                      type="color"
+                      value={config.themeOverride?.primaryColor || '#6366f1'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        primaryColor: e.target.value,
+                      })}
+                      className="w-12 h-10 p-1"
+                    />
+                    <Input
+                      value={config.themeOverride?.primaryColor || '#6366f1'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        primaryColor: e.target.value,
+                      })}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="themeBgColor">Cor de Fundo</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="themeBgColor"
+                      type="color"
+                      value={config.themeOverride?.backgroundColor || '#ffffff'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        backgroundColor: e.target.value,
+                      })}
+                      className="w-12 h-10 p-1"
+                    />
+                    <Input
+                      value={config.themeOverride?.backgroundColor || '#ffffff'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        backgroundColor: e.target.value,
+                      })}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="themeTextColor">Cor do Texto</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="themeTextColor"
+                      type="color"
+                      value={config.themeOverride?.textColor || '#1f2937'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        textColor: e.target.value,
+                      })}
+                      className="w-12 h-10 p-1"
+                    />
+                    <Input
+                      value={config.themeOverride?.textColor || '#1f2937'}
+                      onChange={(e) => updateConfig('themeOverride', {
+                        ...config.themeOverride,
+                        textColor: e.target.value,
+                      })}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Animação</Label>
+                  <Select
+                    value={config.themeOverride?.animation || 'pulse'}
+                    onValueChange={(value) => updateConfig('themeOverride', {
+                      ...config.themeOverride,
+                      animation: value as StepThemeOverride['animation'],
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pulse">Pulsar</SelectItem>
+                      <SelectItem value="glow">Brilho</SelectItem>
+                      <SelectItem value="border">Borda</SelectItem>
+                      <SelectItem value="shake">Tremer</SelectItem>
+                      <SelectItem value="bounce">Pular</SelectItem>
+                      <SelectItem value="fade">Fade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Arredondamento</Label>
+                  <div className="flex gap-2">
+                    {(['none', 'sm', 'rounded', 'lg', 'xl'] as const).map((radius) => (
+                      <button
+                        key={radius}
+                        onClick={() => updateConfig('themeOverride', {
+                          ...config.themeOverride,
+                          borderRadius: radius,
+                        })}
+                        className={`flex-1 py-2 px-3 text-xs border rounded transition-all ${
+                          (config.themeOverride?.borderRadius || 'rounded') === radius
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {radius === 'none' ? '□' : radius === 'sm' ? '◢' : radius === 'rounded' ? '◓' : radius === 'lg' ? '◔' : '●'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-2">Preview</p>
+                  <div
+                    className="p-4 rounded shadow-lg"
+                    style={{
+                      backgroundColor: config.themeOverride?.backgroundColor || '#ffffff',
+                      color: config.themeOverride?.textColor || '#1f2937',
+                      borderRadius: config.themeOverride?.borderRadius === 'none' ? '0' :
+                        config.themeOverride?.borderRadius === 'sm' ? '4px' :
+                        config.themeOverride?.borderRadius === 'lg' ? '12px' :
+                        config.themeOverride?.borderRadius === 'xl' ? '16px' : '8px',
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className="text-xs font-semibold px-2 py-1 rounded text-white"
+                        style={{ backgroundColor: config.themeOverride?.primaryColor || '#6366f1' }}
+                      >
+                        Passo 1
+                      </span>
+                      <span className="font-medium text-sm">{config.title || 'Título do Passo'}</span>
+                    </div>
+                    <p className="text-xs opacity-80">{config.description || 'Descrição do passo aqui...'}</p>
+                  </div>
+                </div>
+              </div>
             )}
           </TabsContent>
         </Tabs>
