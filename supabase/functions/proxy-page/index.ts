@@ -837,7 +837,8 @@ serve(async (req: Request) => {
         ...corsHeaders,
         'Content-Type': 'text/html; charset=utf-8',
         'X-Frame-Options': 'ALLOWALL',
-        'Content-Security-Policy': "frame-ancestors *;",
+        // Fully permissive CSP to allow injected scripts and inline styles
+        'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src *; frame-ancestors *;",
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
       },
