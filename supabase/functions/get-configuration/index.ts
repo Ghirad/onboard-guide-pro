@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
         description: config.description,
         target_url: config.target_url,
         widget_position: config.widget_position,
-        auto_start: config.auto_start
+        auto_start: config.auto_start,
+        allowed_routes: config.allowed_routes || []
       },
       steps: stepsWithSortedActions
     };
