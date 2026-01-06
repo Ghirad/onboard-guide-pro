@@ -56,6 +56,35 @@ export function useConfigurationSteps(configurationId: string | undefined) {
   });
 }
 
+// New hook: Steps with their actions for Visual Builder
+export interface SetupStepWithActions extends SetupStep {
+  step_actions: StepAction[];
+}
+
+export function useConfigurationStepsWithActions(configurationId: string | undefined) {
+  return useQuery({
+    queryKey: ["steps-with-actions", configurationId],
+    queryFn: async () => {
+      if (!configurationId) return [];
+      
+      const { data, error } = await supabase
+        .from("setup_steps")
+        .select("*, step_actions(*)")
+        .eq("configuration_id", configurationId)
+        .order("step_order", { ascending: true });
+
+      if (error) throw error;
+      
+      // Sort actions within each step
+      return (data as SetupStepWithActions[]).map(step => ({
+        ...step,
+        step_actions: (step.step_actions || []).sort((a, b) => a.action_order - b.action_order),
+      }));
+    },
+    enabled: !!configurationId,
+  });
+}
+
 export function useStepActions(stepId: string | undefined) {
   return useQuery({
     queryKey: ["actions", stepId],
