@@ -12,6 +12,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   
   // State
   let isActive = true;
+  let isPaused = false;
   let hoveredElement = null;
   let configPanel = null;
   let currentElement = null;
@@ -52,30 +53,69 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   // Create control panel
   const panel = document.createElement('div');
   panel.id = 'tour-capture-panel';
-  panel.innerHTML = \`
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="color: #22c55e;">●</span>
-      <span>Tour Capture Ativo</span>
-      <button id="tour-capture-scan" style="
-        background: #3b82f6;
-        border: none;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 11px;
-      ">Scan</button>
-      <button id="tour-capture-exit" style="
-        background: #ef4444;
-        border: none;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 11px;
-      ">Sair</button>
-    </div>
-  \`;
+  
+  function updatePanelUI() {
+    const statusIndicator = isPaused ? '⏸' : '●';
+    const statusColor = isPaused ? '#eab308' : '#22c55e';
+    const statusText = isPaused ? 'Pausado' : 'Ativo';
+    const pauseButtonText = isPaused ? '▶ Retomar' : '⏸ Pausar';
+    const pauseButtonBg = isPaused ? '#22c55e' : '#6b7280';
+    
+    panel.innerHTML = \`
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: \${statusColor};">\${statusIndicator}</span>
+        <span>Tour Capture \${statusText}</span>
+        <button id="tour-capture-scan" style="
+          background: #3b82f6;
+          border: none;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        ">Scan</button>
+        <button id="tour-capture-pause" style="
+          background: \${pauseButtonBg};
+          border: none;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        ">\${pauseButtonText}</button>
+        <button id="tour-capture-exit" style="
+          background: #ef4444;
+          border: none;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        ">Sair</button>
+      </div>
+      <div style="font-size: 10px; color: #9ca3af; margin-top: 6px;">
+        Pressione <kbd style="background: #374151; padding: 1px 4px; border-radius: 3px;">P</kbd> para \${isPaused ? 'retomar' : 'pausar'}
+      </div>
+    \`;
+    
+    // Re-attach event listeners after innerHTML update
+    document.getElementById('tour-capture-scan').addEventListener('click', scanElements);
+    document.getElementById('tour-capture-pause').addEventListener('click', togglePause);
+    document.getElementById('tour-capture-exit').addEventListener('click', cleanup);
+  }
+  
+  function togglePause() {
+    isPaused = !isPaused;
+    if (isPaused) {
+      overlay.style.display = 'none';
+      tooltip.style.display = 'none';
+      console.log('[Tour Capture] Pausado - interaja com a página normalmente');
+    } else {
+      console.log('[Tour Capture] Retomado - captura ativa');
+    }
+    updatePanelUI();
+  }
+  
   panel.style.cssText = \`
     position: fixed;
     top: 10px;
@@ -90,6 +130,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   \`;
   document.body.appendChild(panel);
+  updatePanelUI();
   
   // Generate CSS selector
   function generateSelector(el) {
@@ -436,7 +477,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   
   // Mouse handlers
   function handleMouseMove(e) {
-    if (!isActive) return;
+    if (!isActive || isPaused) return;
     
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (el && el !== overlay && el !== tooltip && el !== panel && !panel.contains(el) && (!configPanel || !configPanel.contains(el))) {
@@ -446,7 +487,7 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   }
   
   function handleClick(e) {
-    if (!isActive || !hoveredElement) return;
+    if (!isActive || isPaused || !hoveredElement) return;
     if (e.target === panel || panel.contains(e.target)) return;
     if (configPanel && configPanel.contains(e.target)) return;
     
@@ -528,11 +569,15 @@ export function generateCaptureScript(token: string, builderOrigin: string): str
   document.addEventListener('mousemove', handleMouseMove, true);
   document.addEventListener('click', handleClick, true);
   
-  document.getElementById('tour-capture-scan').addEventListener('click', scanElements);
-  document.getElementById('tour-capture-exit').addEventListener('click', cleanup);
-  
-  // Escape key to close config panel or exit
+  // Escape key to close config panel or exit, P to pause/resume
   document.addEventListener('keydown', (e) => {
+    // P key to toggle pause (only when not in config panel and not typing)
+    if ((e.key === 'p' || e.key === 'P') && !configPanel && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
+    
     if (e.key === 'Escape') {
       if (configPanel) {
         configPanel.remove();
