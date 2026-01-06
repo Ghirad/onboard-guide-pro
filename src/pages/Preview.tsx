@@ -8,6 +8,7 @@ import { useConfiguration, useConfigurationSteps, useStepActions } from "@/hooks
 import { Loader2, ArrowLeft, Play, X, ChevronLeft, ChevronRight, Check, SkipForward } from "lucide-react";
 import { SetupStep } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { TopBarWidget } from "@/components/widget/TopBarWidget";
 
 export default function Preview() {
   const { id } = useParams<{ id: string }>();
@@ -94,7 +95,26 @@ export default function Preview() {
         </div>
 
         {/* Preview Area */}
-        <div className="relative flex-1 bg-muted/30 p-8">
+        <div className={cn(
+          "relative flex-1 bg-muted/30 p-8",
+          config.widget_position === "top-bar" && isWidgetOpen && "pt-24"
+        )}>
+          {/* Top Bar Widget */}
+          {config.widget_position === "top-bar" && isWidgetOpen && (
+            <TopBarWidget
+              configName={config.name}
+              steps={steps}
+              currentStepIndex={currentStepIndex}
+              completedSteps={completedSteps}
+              skippedSteps={skippedSteps}
+              actions={actions}
+              onStepChange={setCurrentStepIndex}
+              onComplete={handleCompleteStep}
+              onSkip={handleSkipStep}
+              onClose={() => setIsWidgetOpen(false)}
+            />
+          )}
+
           {/* Simulated Page */}
           <div className="mx-auto h-full max-w-4xl rounded-lg border border-border bg-background shadow-lg">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -113,28 +133,41 @@ export default function Preview() {
             </div>
           </div>
 
-          {/* Widget Floating Button */}
-          <button
-            onClick={() => setIsWidgetOpen(true)}
-            className={cn(
-              "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-105",
-              config.widget_position === "bottom-right" && "bottom-6 right-6",
-              config.widget_position === "bottom-left" && "bottom-6 left-6",
-              config.widget_position === "top-right" && "top-20 right-6",
-              config.widget_position === "top-left" && "top-20 left-6",
-              isWidgetOpen && "hidden"
-            )}
-          >
-            <Play className="h-6 w-6" />
-            {steps.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
-                {completedSteps.size}/{steps.length}
-              </span>
-            )}
-          </button>
+          {/* Widget Floating Button - Only for non-top-bar positions */}
+          {config.widget_position !== "top-bar" && (
+            <button
+              onClick={() => setIsWidgetOpen(true)}
+              className={cn(
+                "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-105",
+                config.widget_position === "bottom-right" && "bottom-6 right-6",
+                config.widget_position === "bottom-left" && "bottom-6 left-6",
+                config.widget_position === "top-right" && "top-20 right-6",
+                config.widget_position === "top-left" && "top-20 left-6",
+                isWidgetOpen && "hidden"
+              )}
+            >
+              <Play className="h-6 w-6" />
+              {steps.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
+                  {completedSteps.size}/{steps.length}
+                </span>
+              )}
+            </button>
+          )}
 
-          {/* Widget Sidebar */}
-          {isWidgetOpen && (
+          {/* Top Bar Minimized Button */}
+          {config.widget_position === "top-bar" && !isWidgetOpen && (
+            <button
+              onClick={() => setIsWidgetOpen(true)}
+              className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-primary-foreground shadow-lg transition-all hover:scale-105"
+            >
+              <Play className="h-4 w-4" />
+              <span className="text-sm font-medium">{completedSteps.size}/{steps.length}</span>
+            </button>
+          )}
+
+          {/* Widget Sidebar - Only for non-top-bar positions */}
+          {config.widget_position !== "top-bar" && isWidgetOpen && (
             <div
               className={cn(
                 "fixed top-0 z-50 flex h-full w-96 flex-col bg-background shadow-2xl",
