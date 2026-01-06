@@ -13,7 +13,8 @@ import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
-import { useConfiguration, useConfigurationSteps, useCreateStep, useUpdateStep, useDeleteStep } from '@/hooks/useConfigurations';
+import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, SetupStepWithActions } from '@/hooks/useConfigurations';
+import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
 interface CapturedElement {
@@ -29,11 +30,28 @@ export default function VisualTourBuilder() {
   const { toast } = useToast();
 
   const { data: configuration, isLoading: configLoading } = useConfiguration(id);
-  const { data: dbSteps, isLoading: stepsLoading } = useConfigurationSteps(id);
+  const { data: dbStepsWithActions, isLoading: stepsLoading, refetch: refetchSteps } = useConfigurationStepsWithActions(id);
 
   const createStep = useCreateStep();
   const updateStep = useUpdateStep();
   const deleteStep = useDeleteStep();
+  const createAction = useCreateAction();
+
+  // Helper to derive TourStepType from database step + actions
+  const deriveStepType = (step: SetupStepWithActions): TourStepType => {
+    if (step.target_type === 'modal') return 'modal';
+    
+    const firstAction = step.step_actions?.[0];
+    if (firstAction) {
+      const actionType = firstAction.action_type;
+      if (['click', 'input', 'wait', 'highlight'].includes(actionType)) {
+        return actionType as TourStepType;
+      }
+      if (actionType === 'open_modal') return 'modal';
+    }
+    
+    return 'tooltip';
+  };
 
   const [state, setState] = useState<VisualBuilderState>({
     isSelectionMode: false,
@@ -58,31 +76,42 @@ export default function VisualTourBuilder() {
   
   const iframeContainerRef = useRef<IframeContainerRef>(null);
 
-  // Sync steps from database
+  // Sync steps from database - with correct type mapping
   useEffect(() => {
-    if (dbSteps) {
-      const mappedSteps: TourStep[] = dbSteps.map((step) => ({
-        id: step.id,
-        order: step.step_order,
-        type: (step.target_type === 'modal' ? 'modal' : 'tooltip') as TourStep['type'],
-        selector: step.target_selector || '',
-        element: {
-          tagName: 'div',
-          id: null,
-          classList: [],
-          textContent: '',
-          selector: step.target_selector || '',
-          rect: { top: 0, left: 0, width: 0, height: 0 },
-        },
-        config: {
-          title: step.title,
-          description: step.description || '',
-          position: 'auto',
-        },
-      }));
+    if (dbStepsWithActions) {
+      const mappedSteps: TourStep[] = dbStepsWithActions.map((step) => {
+        const stepType = deriveStepType(step);
+        const firstAction = step.step_actions?.[0];
+        
+        // Get selector from step or first action
+        const selector = step.target_selector || firstAction?.selector || '';
+        
+        return {
+          id: step.id,
+          order: step.step_order,
+          type: stepType,
+          selector,
+          element: {
+            tagName: 'div',
+            id: null,
+            classList: [],
+            textContent: '',
+            selector,
+            rect: { top: 0, left: 0, width: 0, height: 0 },
+          },
+          config: {
+            title: step.title,
+            description: step.description || '',
+            position: 'auto',
+            delayMs: firstAction?.delay_ms || undefined,
+            highlightColor: firstAction?.highlight_color || undefined,
+            highlightAnimation: firstAction?.highlight_animation || undefined,
+          },
+        };
+      });
       setState(prev => ({ ...prev, steps: mappedSteps }));
     }
-  }, [dbSteps]);
+  }, [dbStepsWithActions]);
 
   const handleCapturedElement = useCallback((element: CapturedElement) => {
     const selectedElement: SelectedElement = {
@@ -146,25 +175,80 @@ export default function VisualTourBuilder() {
     stepType: string;
     selector: string;
     element: { tagName: string; label: string; rect: { top: number; left: number; width: number; height: number } };
-    config: { title: string; description: string | null; position: string };
+    config: { title: string; description: string | null; position: string; delayMs?: number };
   }) => {
     if (!id) return;
     
+    // Validate selector
+    if (!stepData.selector || stepData.selector.trim() === '') {
+      toast({
+        title: 'Erro',
+        description: 'Seletor inválido. Capture o elemento novamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
-      const newOrder = state.steps.length + 1;
+      const newOrder = state.steps.length; // 0-based
+      const stepType = stepData.stepType as TourStepType;
       
-      await createStep.mutateAsync({
+      // Create the step
+      const createdStep = await createStep.mutateAsync({
         configurationId: id,
         step: {
-          title: stepData.config.title || `Passo ${newOrder}`,
+          title: stepData.config.title || `Passo ${newOrder + 1}`,
           description: stepData.config.description || null,
           instructions: stepData.config.description || null,
-          target_type: stepData.stepType === 'modal' ? 'modal' : 'page',
+          target_type: stepType === 'modal' ? 'modal' : 'page',
           target_selector: stepData.selector,
           step_order: newOrder,
           is_required: true,
         },
       });
+      
+      // Create step_action for action types (click, input, wait, highlight)
+      if (['click', 'input', 'wait', 'highlight'].includes(stepType)) {
+        await createAction.mutateAsync({
+          stepId: createdStep.id,
+          action: {
+            action_type: stepType as 'click' | 'input' | 'wait' | 'highlight',
+            selector: stepData.selector,
+            action_order: 0,
+            delay_ms: stepType === 'wait' ? (stepData.config.delayMs || 500) : 0,
+            description: stepData.config.title || null,
+          },
+        });
+      }
+      
+      // Optimistic update - add to local state immediately
+      const newStep: TourStep = {
+        id: createdStep.id,
+        order: newOrder,
+        type: stepType,
+        selector: stepData.selector,
+        element: {
+          tagName: stepData.element.tagName,
+          id: null,
+          classList: [],
+          textContent: stepData.element.label || '',
+          selector: stepData.selector,
+          rect: stepData.element.rect || { top: 0, left: 0, width: 0, height: 0 },
+        },
+        config: {
+          title: stepData.config.title || `Passo ${newOrder + 1}`,
+          description: stepData.config.description || '',
+          position: (stepData.config.position || 'auto') as 'auto' | 'top' | 'bottom' | 'left' | 'right',
+        },
+      };
+      
+      setState(prev => ({
+        ...prev,
+        steps: [...prev.steps, newStep],
+      }));
+      
+      // Refetch to sync with database
+      refetchSteps();
       
       toast({
         title: '✓ Passo adicionado!',
@@ -174,13 +258,14 @@ export default function VisualTourBuilder() {
       // Switch to steps tab to show the new step
       setSidebarTab('steps');
     } catch (error) {
+      console.error('[VisualTourBuilder] Error saving step:', error);
       toast({
         title: 'Erro',
         description: 'Falha ao salvar o passo.',
         variant: 'destructive',
       });
     }
-  }, [id, state.steps.length, createStep, toast]);
+  }, [id, state.steps.length, createStep, createAction, refetchSteps, toast]);
 
   // Listen for capture messages from external script/extension
   useEffect(() => {
@@ -242,9 +327,10 @@ export default function VisualTourBuilder() {
         const newIndex = prev.steps.findIndex(s => s.id === over.id);
         const newSteps = arrayMove(prev.steps, oldIndex, newIndex).map((step, index) => ({
           ...step,
-          order: index + 1,
+          order: index, // 0-based
         }));
 
+        // Update all steps with new order (0-based)
         newSteps.forEach(step => {
           updateStep.mutate({ id: step.id, configurationId: id!, step_order: step.order });
         });
@@ -313,23 +399,41 @@ export default function VisualTourBuilder() {
     if (!id) return;
 
     try {
-      const newOrder = state.steps.length + 1;
+      const newOrder = state.steps.length; // 0-based
+      const stepType = stepData.type;
 
-      await createStep.mutateAsync({
+      const createdStep = await createStep.mutateAsync({
         configurationId: id,
         step: {
-          title: stepData.config.title || `Passo ${newOrder}`,
+          title: stepData.config.title || `Passo ${newOrder + 1}`,
           description: stepData.config.description || null,
           instructions: stepData.config.description || null,
-          target_type: stepData.type === 'modal' ? 'modal' : 'page',
+          target_type: stepType === 'modal' ? 'modal' : 'page',
           target_selector: stepData.selector,
           step_order: newOrder,
           is_required: true,
         },
       });
+      
+      // Create step_action for action types
+      if (['click', 'input', 'wait', 'highlight'].includes(stepType)) {
+        await createAction.mutateAsync({
+          stepId: createdStep.id,
+          action: {
+            action_type: stepType as 'click' | 'input' | 'wait' | 'highlight',
+            selector: stepData.selector,
+            action_order: 0,
+            delay_ms: stepData.config.delayMs || 0,
+            highlight_color: stepData.config.highlightColor || '#ff9f0d',
+            highlight_animation: stepData.config.highlightAnimation || 'pulse',
+            description: stepData.config.title || null,
+          },
+        });
+      }
 
       setShowConfigPanel(false);
       setState(prev => ({ ...prev, selectedElement: null }));
+      refetchSteps();
 
       toast({
         title: 'Passo adicionado',
