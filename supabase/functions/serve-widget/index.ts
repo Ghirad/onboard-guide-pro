@@ -470,15 +470,26 @@ const widgetScript = `
       var isLastStep = this._currentStepIndex === this._steps.length - 1;
       var buttonText = this._currentStepIndex === 0 ? 'Começar' : (isLastStep ? 'Finalizar' : 'Próximo');
       
+      // Get step theme (with override support)
+      var stepTheme = this._getStepTheme(step);
+      
+      var modalStyle = stepTheme.isOverride
+        ? 'background:' + stepTheme.backgroundColor + '; color:' + stepTheme.textColor + ';'
+        : '';
+      
+      var buttonStyle = stepTheme.isOverride
+        ? 'background:' + stepTheme.primaryColor + '; color: white;'
+        : '';
+      
       this._container.innerHTML = '<div class="autosetup-modal-overlay">' +
-        '<div class="autosetup-modal">' +
+        '<div class="autosetup-modal" style="' + modalStyle + '">' +
           (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-modal-image" alt=""/>' : '') +
           '<h3>' + this._escapeHtml(step.title) + '</h3>' +
           '<p>' + this._escapeHtml(step.description || '') + '</p>' +
           '<div class="autosetup-modal-progress">Passo ' + (this._currentStepIndex + 1) + ' de ' + progress.total + '</div>' +
           '<div class="autosetup-modal-actions">' +
             (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
-            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -499,9 +510,14 @@ const widgetScript = `
       
       // Render tooltip near element
       if (step.target_selector) {
+        // Get step theme for highlight
+        var stepTheme = this._getStepTheme(step);
+        
         setTimeout(function() {
           self._renderTooltip(step);
-          self._highlightElement(step.target_selector);
+          // Use step-specific animation if overridden
+          var animation = stepTheme.isOverride ? stepTheme.animation : null;
+          self._highlightElement(step.target_selector, animation);
           
           // Auto-advance when clicking on target element
           if (self._config.autoAdvanceOnClick) {
@@ -531,6 +547,9 @@ const widgetScript = `
       
       var self = this;
       
+      // Get step theme (with override support)
+      var stepTheme = this._getStepTheme(step);
+      
       // Small delay to allow scroll to complete
       setTimeout(function() {
         var rect = el.getBoundingClientRect();
@@ -542,22 +561,66 @@ const widgetScript = `
         tooltip.id = 'autosetup-tooltip';
         tooltip.className = 'autosetup-tooltip';
         
+        // Apply step-specific theme if enabled
+        if (stepTheme.isOverride) {
+          tooltip.style.backgroundColor = stepTheme.backgroundColor;
+          tooltip.style.color = stepTheme.textColor;
+          if (stepTheme.borderRadius) {
+            var radiusMap = { none: '0', sm: '4px', rounded: '12px', lg: '16px', xl: '20px' };
+            tooltip.style.borderRadius = radiusMap[stepTheme.borderRadius] || '12px';
+          }
+        }
+        
+        var stepBadgeStyle = stepTheme.isOverride 
+          ? 'background:' + stepTheme.primaryColor + ';' 
+          : 'background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%);';
+        
+        var buttonStyle = stepTheme.isOverride
+          ? 'background:' + stepTheme.primaryColor + '; color: white;'
+          : '';
+        
         tooltip.innerHTML = 
           '<div class="autosetup-tooltip-arrow arrow-' + position.arrowPosition + '"></div>' +
           (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-tooltip-image" alt=""/>' : '') +
           '<div class="autosetup-tooltip-header">' +
-            '<span class="autosetup-tooltip-step">Passo ' + (self._currentStepIndex + 1) + '</span>' +
+            '<span class="autosetup-tooltip-step" style="' + stepBadgeStyle + '">Passo ' + (self._currentStepIndex + 1) + '</span>' +
             '<span class="autosetup-tooltip-title">' + self._escapeHtml(step.title) + '</span>' +
           '</div>' +
           '<div class="autosetup-tooltip-desc">' + self._escapeHtml(step.description || '') + '</div>' +
           '<div class="autosetup-tooltip-actions">' +
             (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
-            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
           '</div>';
         
-        tooltip.style.cssText = position.style;
+        tooltip.style.cssText += position.style;
         document.body.appendChild(tooltip);
       }, 300);
+    },
+
+    _getStepTheme: function(step) {
+      // Start with global theme
+      var globalTheme = this._config.theme || {};
+      var theme = {
+        primaryColor: globalTheme.primaryColor || '#6366f1',
+        secondaryColor: globalTheme.secondaryColor || '#8b5cf6',
+        backgroundColor: globalTheme.backgroundColor || '#ffffff',
+        textColor: globalTheme.textColor || '#1f2937',
+        animation: globalTheme.highlightAnimation || 'pulse',
+        borderRadius: globalTheme.borderRadius || 'rounded',
+        isOverride: false
+      };
+      
+      // Apply step theme override if enabled
+      if (step.theme_override && step.theme_override.enabled) {
+        theme.isOverride = true;
+        if (step.theme_override.primaryColor) theme.primaryColor = step.theme_override.primaryColor;
+        if (step.theme_override.backgroundColor) theme.backgroundColor = step.theme_override.backgroundColor;
+        if (step.theme_override.textColor) theme.textColor = step.theme_override.textColor;
+        if (step.theme_override.animation) theme.animation = step.theme_override.animation;
+        if (step.theme_override.borderRadius) theme.borderRadius = step.theme_override.borderRadius;
+      }
+      
+      return theme;
     },
 
     _calculateTooltipPosition: function(rect) {

@@ -63,10 +63,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Sort actions within each step by action_order
+    // Sort actions within each step by action_order and include theme_override
     const stepsWithSortedActions = (steps || []).map(step => ({
       ...step,
-      actions: (step.actions || []).sort((a: any, b: any) => a.action_order - b.action_order)
+      actions: (step.actions || []).sort((a: any, b: any) => a.action_order - b.action_order),
+      theme_override: step.theme_override || null,
     }));
 
     // Return configuration and steps
