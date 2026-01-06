@@ -555,7 +555,14 @@ export function StepConfigPanel({
                 <div className="mt-4 p-4 border rounded-lg bg-muted/30">
                   <p className="text-xs text-muted-foreground mb-2">Preview</p>
                   <div
-                    className="p-4 rounded shadow-lg"
+                    className={`p-4 rounded shadow-lg ${
+                      config.themeOverride?.animation === 'pulse' ? 'animate-highlight-pulse' :
+                      config.themeOverride?.animation === 'glow' ? 'animate-highlight-glow' :
+                      config.themeOverride?.animation === 'border' ? 'animate-highlight-border' :
+                      config.themeOverride?.animation === 'shake' ? 'animate-highlight-shake' :
+                      config.themeOverride?.animation === 'bounce' ? 'animate-highlight-bounce' :
+                      config.themeOverride?.animation === 'fade' ? 'animate-highlight-fade' : ''
+                    }`}
                     style={{
                       backgroundColor: config.themeOverride?.backgroundColor || '#ffffff',
                       color: config.themeOverride?.textColor || '#1f2937',
@@ -563,6 +570,12 @@ export function StepConfigPanel({
                         config.themeOverride?.borderRadius === 'sm' ? '4px' :
                         config.themeOverride?.borderRadius === 'lg' ? '12px' :
                         config.themeOverride?.borderRadius === 'xl' ? '16px' : '8px',
+                      border: config.themeOverride?.animation === 'border' 
+                        ? `2px solid ${config.themeOverride?.primaryColor || '#6366f1'}` 
+                        : undefined,
+                      boxShadow: config.themeOverride?.animation === 'glow' 
+                        ? `0 0 15px ${config.themeOverride?.primaryColor || '#6366f1'}` 
+                        : undefined,
                     }}
                   >
                     <div className="flex items-center gap-2 mb-2">
