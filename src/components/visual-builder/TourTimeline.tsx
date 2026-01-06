@@ -1,3 +1,4 @@
+import { forwardRef, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2, Eye, MessageSquare, Type, Sparkles, MousePointer, Keyboard, Clock } from 'lucide-react';
@@ -30,26 +31,40 @@ interface SortableStepProps {
   onMouseLeave: () => void;
 }
 
-function SortableStep({ step, onEdit, onDelete, onPreview, onMouseEnter, onMouseLeave }: SortableStepProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: step.id });
+const SortableStep = forwardRef<HTMLDivElement, SortableStepProps>(
+  function SortableStep({ step, onEdit, onDelete, onPreview, onMouseEnter, onMouseLeave }, forwardedRef) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: step.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+    // Combine refs from useSortable and forwardRef
+    const combinedRef = useCallback(
+      (node: HTMLDivElement | null) => {
+        setNodeRef(node);
+        if (typeof forwardedRef === 'function') {
+          forwardedRef(node);
+        } else if (forwardedRef) {
+          forwardedRef.current = node;
+        }
+      },
+      [setNodeRef, forwardedRef]
+    );
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={combinedRef}
+        style={style}
       className="flex items-center gap-2 p-3 bg-card border rounded-lg group hover:border-primary/50 transition-colors"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -89,8 +104,9 @@ function SortableStep({ step, onEdit, onDelete, onPreview, onMouseEnter, onMouse
         </Button>
       </div>
     </div>
-  );
-}
+    );
+  }
+);
 
 export function TourTimeline({
   steps,
