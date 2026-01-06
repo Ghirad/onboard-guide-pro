@@ -22,6 +22,7 @@ export interface SetupConfiguration {
   is_active: boolean;
   widget_position: string;
   auto_start: boolean;
+  allowed_routes?: string[] | null;
   api_key: string;
   created_at: string;
   updated_at: string;
