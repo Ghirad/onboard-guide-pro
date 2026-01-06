@@ -300,10 +300,12 @@ export function generateCaptureScript(
     const stopPropagationHandler = (e) => {
       e.stopPropagation();
     };
-    configPanel.addEventListener('click', stopPropagationHandler, true);
-    configPanel.addEventListener('mousedown', stopPropagationHandler, true);
-    configPanel.addEventListener('mouseup', stopPropagationHandler, true);
-    configPanel.addEventListener('pointerdown', stopPropagationHandler, true);
+    // Use BUBBLE phase (false) instead of capture phase so button handlers run first
+    configPanel.addEventListener('click', stopPropagationHandler, false);
+    configPanel.addEventListener('mousedown', stopPropagationHandler, false);
+    configPanel.addEventListener('mouseup', stopPropagationHandler, false);
+    configPanel.addEventListener('pointerdown', stopPropagationHandler, false);
+    // Keep keyboard events in capture to protect inputs
     configPanel.addEventListener('keydown', stopPropagationHandler, true);
     configPanel.addEventListener('keyup', stopPropagationHandler, true);
     configPanel.addEventListener('keypress', stopPropagationHandler, true);
@@ -506,9 +508,12 @@ export function generateCaptureScript(
       }, true);
     });
     
-    // Cancel handler
+    // Cancel handler - use capture phase with stopImmediatePropagation
     configPanel.querySelector('#step-cancel').addEventListener('click', (e) => {
       e.stopPropagation();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      console.log('[Tour Capture] Cancel clicked');
       // Remove focus trap listener
       if (configPanel._focusTrapHandler) {
         document.removeEventListener('focusin', configPanel._focusTrapHandler, true);
@@ -518,11 +523,14 @@ export function generateCaptureScript(
       configPanel.remove();
       configPanel = null;
       isActive = true;
-    });
+    }, true);
     
-    // Save handler
+    // Save handler - use capture phase with stopImmediatePropagation
     configPanel.querySelector('#step-save').addEventListener('click', async (e) => {
       e.stopPropagation();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      console.log('[Tour Capture] Save clicked');
       const title = configPanel.querySelector('#step-title').value.trim();
       const description = configPanel.querySelector('#step-description').value.trim();
       const position = configPanel.querySelector('#step-position').value;
