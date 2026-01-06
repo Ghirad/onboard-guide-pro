@@ -59,7 +59,7 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     JSON.stringify(allowedRoutes) !== JSON.stringify(currentAllowedRoutes);
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 h-full overflow-y-auto">
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="config-name">Nome da Configuração</Label>
