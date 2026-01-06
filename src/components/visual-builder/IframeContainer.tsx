@@ -42,10 +42,11 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scriptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const addDebugLog = useCallback((message: string) => {
+  const addDebugLog = useCallback((message: string, data?: unknown) => {
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[IframeContainer] ${message}`);
-    setDebugInfo(prev => [...prev.slice(-19), `${timestamp}: ${message}`]);
+    const logMessage = data ? `${message}: ${JSON.stringify(data).slice(0, 100)}` : message;
+    console.log(`[IframeContainer] ${logMessage}`);
+    setDebugInfo(prev => [...prev.slice(-29), `${timestamp}: ${logMessage}`]);
   }, []);
 
   const sendMessage = useCallback((message: object) => {
@@ -68,6 +69,12 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (!event.data?.type) return;
+      
+      // Handle debug messages from injection script
+      if (event.data.type === 'TOUR_DEBUG') {
+        addDebugLog(`[Script] ${event.data.message}`, event.data.data);
+        return;
+      }
       
       addDebugLog(`Received: ${event.data.type}`);
       
@@ -178,14 +185,14 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
       setDebugInfo([]);
       isReadyRef.current = false;
 
-      // Set a timeout for initial load
+      // Set a timeout for initial load (longer for SPAs)
       loadTimeoutRef.current = setTimeout(() => {
         if (!isReadyRef.current && loadingState !== 'error') {
-          addDebugLog('Load timeout reached');
+          addDebugLog('Load timeout reached (30s)');
           setLoadingState('error');
           setErrorMessage('A página demorou muito para carregar. Verifique se a URL está correta e acessível.');
         }
-      }, 20000);
+      }, 30000);
     }
 
     return () => {
@@ -199,13 +206,14 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
     setLoadingState('waiting_script');
     
     // Wait for the injection script to send IFRAME_READY
+    // Longer timeout for React/SPA sites that need hydration time
     scriptTimeoutRef.current = setTimeout(() => {
       if (!isReadyRef.current) {
-        addDebugLog('Script timeout - IFRAME_READY not received');
+        addDebugLog('Script timeout - IFRAME_READY not received after 15s');
         setLoadingState('error');
-        setErrorMessage('O script de comunicação não respondeu. A página pode ter políticas de segurança restritivas.');
+        setErrorMessage('O script de comunicação não respondeu. Isso pode acontecer com sites React/SPA que bloqueiam scripts externos.');
       }
-    }, 8000);
+    }, 15000);
   }, [addDebugLog]);
 
   const handleRetry = () => {
