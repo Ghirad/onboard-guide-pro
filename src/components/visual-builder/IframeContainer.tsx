@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { IFRAME_INJECTION_SCRIPT } from '@/utils/selectorGenerator';
-import { SelectedElement } from '@/types/visualBuilder';
+import { SelectedElement, TourStep } from '@/types/visualBuilder';
 
 interface IframeContainerProps {
   proxyUrl: string;
@@ -8,6 +8,9 @@ interface IframeContainerProps {
   onElementSelected: (element: SelectedElement) => void;
   onIframeReady: () => void;
   highlightSelector?: string;
+  isPreviewMode?: boolean;
+  previewStep?: TourStep | null;
+  onPreviewAction?: (action: 'next' | 'skip') => void;
 }
 
 export function IframeContainer({
@@ -16,6 +19,9 @@ export function IframeContainer({
   onElementSelected,
   onIframeReady,
   highlightSelector,
+  isPreviewMode = false,
+  previewStep,
+  onPreviewAction,
 }: IframeContainerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isReadyRef = useRef(false);
@@ -33,24 +39,85 @@ export function IframeContainer({
         onIframeReady();
       } else if (event.data.type === 'ELEMENT_SELECTED') {
         onElementSelected(event.data.data as SelectedElement);
+      } else if (event.data.type === 'PREVIEW_ACTION') {
+        onPreviewAction?.(event.data.action as 'next' | 'skip');
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onElementSelected, onIframeReady]);
+  }, [onElementSelected, onIframeReady, onPreviewAction]);
 
   useEffect(() => {
     sendMessage({ type: 'SET_SELECTION_MODE', enabled: isSelectionMode });
   }, [isSelectionMode, sendMessage]);
 
   useEffect(() => {
-    if (highlightSelector) {
+    sendMessage({ type: 'SET_PREVIEW_MODE', enabled: isPreviewMode });
+  }, [isPreviewMode, sendMessage]);
+
+  useEffect(() => {
+    if (!isPreviewMode || !previewStep) {
+      sendMessage({ type: 'HIDE_ALL' });
+      return;
+    }
+
+    const { type, selector, config } = previewStep;
+
+    switch (type) {
+      case 'tooltip':
+        sendMessage({
+          type: 'SHOW_TOOLTIP',
+          config: {
+            selector,
+            title: config.title,
+            description: config.description,
+            position: config.position,
+            buttonText: config.buttonText || 'Next',
+            showSkip: config.showSkip,
+            skipButtonText: config.skipButtonText,
+            imageUrl: config.imageUrl,
+          },
+        });
+        break;
+      case 'modal':
+        sendMessage({
+          type: 'SHOW_MODAL',
+          config: {
+            title: config.title,
+            description: config.description,
+            buttonText: config.buttonText || 'Next',
+            showSkip: config.showSkip,
+            skipButtonText: config.skipButtonText,
+            imageUrl: config.imageUrl,
+          },
+        });
+        break;
+      case 'highlight':
+      case 'click':
+      case 'input':
+        sendMessage({
+          type: 'SHOW_HIGHLIGHT',
+          config: {
+            selector,
+            animation: config.highlightAnimation || 'pulse',
+            color: config.highlightColor,
+          },
+        });
+        break;
+      case 'wait':
+        // Wait steps auto-advance via PreviewOverlay
+        break;
+    }
+  }, [isPreviewMode, previewStep, sendMessage]);
+
+  useEffect(() => {
+    if (highlightSelector && !isPreviewMode) {
       sendMessage({ type: 'HIGHLIGHT_ELEMENT', selector: highlightSelector });
-    } else {
+    } else if (!isPreviewMode) {
       sendMessage({ type: 'CLEAR_HIGHLIGHT' });
     }
-  }, [highlightSelector, sendMessage]);
+  }, [highlightSelector, isPreviewMode, sendMessage]);
 
   const handleLoad = () => {
     try {

@@ -8,6 +8,7 @@ import { IframeContainer } from '@/components/visual-builder/IframeContainer';
 import { StepConfigPanel } from '@/components/visual-builder/StepConfigPanel';
 import { TourTimeline } from '@/components/visual-builder/TourTimeline';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
+import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationSteps, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useStepActions } from '@/hooks/useConfigurations';
 import { useToast } from '@/hooks/use-toast';
@@ -198,6 +199,74 @@ export default function VisualTourBuilder() {
     navigate(`/config/${id}`);
   };
 
+  // Preview mode handlers
+  const handleStartPreview = useCallback(() => {
+    if (state.steps.length === 0) {
+      toast({
+        title: 'No steps',
+        description: 'Add at least one step to preview the tour.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setState(prev => ({
+      ...prev,
+      isPreviewMode: true,
+      previewStepIndex: 0,
+      isSelectionMode: false,
+    }));
+    setShowConfigPanel(false);
+  }, [state.steps.length, toast]);
+
+  const handleExitPreview = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      isPreviewMode: false,
+      previewStepIndex: 0,
+    }));
+  }, []);
+
+  const handleNextPreviewStep = useCallback(() => {
+    setState(prev => {
+      if (prev.previewStepIndex >= prev.steps.length - 1) {
+        toast({
+          title: 'Tour Complete',
+          description: 'You have finished previewing the tour.',
+        });
+        return {
+          ...prev,
+          isPreviewMode: false,
+          previewStepIndex: 0,
+        };
+      }
+      return {
+        ...prev,
+        previewStepIndex: prev.previewStepIndex + 1,
+      };
+    });
+  }, [toast]);
+
+  const handlePrevPreviewStep = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      previewStepIndex: Math.max(0, prev.previewStepIndex - 1),
+    }));
+  }, []);
+
+  const handlePreviewAction = useCallback((action: 'next' | 'skip') => {
+    if (action === 'next' || action === 'skip') {
+      handleNextPreviewStep();
+    }
+  }, [handleNextPreviewStep]);
+
+  const handleTogglePreviewMode = useCallback(() => {
+    if (state.isPreviewMode) {
+      handleExitPreview();
+    } else {
+      handleStartPreview();
+    }
+  }, [state.isPreviewMode, handleExitPreview, handleStartPreview]);
+
   const proxyUrl = configuration?.target_url
     ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-page?url=${encodeURIComponent(configuration.target_url)}`
     : '';
@@ -213,6 +282,8 @@ export default function VisualTourBuilder() {
   const editingStep = state.currentEditingStepId
     ? state.steps.find(s => s.id === state.currentEditingStepId)
     : null;
+
+  const currentPreviewStep = state.isPreviewMode ? state.steps[state.previewStepIndex] : null;
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -231,7 +302,7 @@ export default function VisualTourBuilder() {
           isSelectionMode={state.isSelectionMode}
           isPreviewMode={state.isPreviewMode}
           onToggleSelectionMode={() => setState(prev => ({ ...prev, isSelectionMode: !prev.isSelectionMode }))}
-          onTogglePreviewMode={() => setState(prev => ({ ...prev, isPreviewMode: !prev.isPreviewMode }))}
+          onTogglePreviewMode={handleTogglePreviewMode}
           onSave={handleSave}
         />
       </header>
@@ -239,39 +310,44 @@ export default function VisualTourBuilder() {
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Steps Timeline */}
-        <aside className="w-80 border-r bg-card overflow-y-auto">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={state.steps.map(s => s.id)}
-              strategy={verticalListSortingStrategy}
+        {!state.isPreviewMode && (
+          <aside className="w-80 border-r bg-card overflow-y-auto">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              <TourTimeline
-                steps={state.steps}
-                onEditStep={handleEditStep}
-                onDeleteStep={handleDeleteStep}
-                onHoverStep={setHighlightSelector}
-              />
-            </SortableContext>
-          </DndContext>
-        </aside>
+              <SortableContext
+                items={state.steps.map(s => s.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <TourTimeline
+                  steps={state.steps}
+                  onEditStep={handleEditStep}
+                  onDeleteStep={handleDeleteStep}
+                  onHoverStep={setHighlightSelector}
+                />
+              </SortableContext>
+            </DndContext>
+          </aside>
+        )}
 
         {/* Iframe Preview */}
-        <main className="flex-1 p-4">
+        <main className={`flex-1 p-4 ${state.isPreviewMode ? 'pb-32' : ''}`}>
           <IframeContainer
             proxyUrl={proxyUrl}
             isSelectionMode={state.isSelectionMode}
             onElementSelected={handleElementSelected}
             onIframeReady={handleIframeReady}
             highlightSelector={highlightSelector || undefined}
+            isPreviewMode={state.isPreviewMode}
+            previewStep={currentPreviewStep}
+            onPreviewAction={handlePreviewAction}
           />
         </main>
 
         {/* Config Panel (conditionally shown) */}
-        {showConfigPanel && (
+        {showConfigPanel && !state.isPreviewMode && (
           <aside className="w-96 border-l bg-card overflow-y-auto">
             <StepConfigPanel
               selectedElement={state.selectedElement}
@@ -290,6 +366,17 @@ export default function VisualTourBuilder() {
           </aside>
         )}
       </div>
+
+      {/* Preview Overlay */}
+      {state.isPreviewMode && (
+        <PreviewOverlay
+          steps={state.steps}
+          currentIndex={state.previewStepIndex}
+          onNext={handleNextPreviewStep}
+          onPrev={handlePrevPreviewStep}
+          onExit={handleExitPreview}
+        />
+      )}
     </div>
   );
 }
