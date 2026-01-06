@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, X, Play, MessageSquare, Type, Sparkles, MousePointer, Keyboard, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -29,7 +30,7 @@ const positionLabels: Record<TooltipPosition, string> = {
   auto: '◉ Auto',
 };
 
-export function PreviewOverlay({
+export const PreviewOverlay = memo(function PreviewOverlay({
   steps,
   currentIndex,
   onNext,
@@ -65,6 +66,17 @@ export function PreviewOverlay({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Add small delay to reduce DOM mutation conflicts with lovable.js
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), 50);
+    return () => {
+      clearTimeout(timer);
+      setIsVisible(false);
+    };
+  }, []);
+
   // Auto-advance for wait steps
   useEffect(() => {
     if (currentStep?.type === 'wait' && currentStep.config.delayMs) {
@@ -73,11 +85,11 @@ export function PreviewOverlay({
     }
   }, [currentStep, onNext]);
 
-  if (!currentStep) return null;
+  if (!isVisible || !currentStep) return null;
 
   const position = currentStep.config.position || 'auto';
 
-  return (
+  const overlayContent = (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-t shadow-lg animate-fade-in">
       <div className="max-w-4xl mx-auto p-4">
         {/* Progress bar */}
@@ -183,4 +195,7 @@ export function PreviewOverlay({
       </div>
     </div>
   );
-}
+
+  // Use portal to render outside main React tree to reduce mutation conflicts
+  return createPortal(overlayContent, document.body);
+});
