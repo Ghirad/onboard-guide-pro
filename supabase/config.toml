@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.create-step]
 verify_jwt = false
+
+[functions.get-configuration]
+verify_jwt = false

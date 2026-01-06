@@ -1,0 +1,90 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const configId = url.searchParams.get('configId');
+    const apiKey = url.searchParams.get('apiKey');
+
+    if (!configId || !apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'configId and apiKey are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch configuration and validate API key
+    const { data: config, error: configError } = await supabase
+      .from('setup_configurations')
+      .select('*')
+      .eq('id', configId)
+      .eq('api_key', apiKey)
+      .eq('is_active', true)
+      .single();
+
+    if (configError || !config) {
+      console.error('Configuration error:', configError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid configuration or API key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch steps for this configuration
+    const { data: steps, error: stepsError } = await supabase
+      .from('setup_steps')
+      .select('*')
+      .eq('configuration_id', configId)
+      .order('step_order', { ascending: true });
+
+    if (stepsError) {
+      console.error('Steps error:', stepsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch steps' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Return configuration and steps
+    const response = {
+      configuration: {
+        id: config.id,
+        name: config.name,
+        description: config.description,
+        target_url: config.target_url,
+        widget_position: config.widget_position,
+        auto_start: config.auto_start
+      },
+      steps: steps || []
+    };
+
+    console.log(`[get-configuration] Returned config ${configId} with ${steps?.length || 0} steps`);
+
+    return new Response(
+      JSON.stringify(response),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
