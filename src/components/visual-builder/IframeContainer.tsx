@@ -3,7 +3,7 @@ import { Loader2, AlertCircle, RefreshCw, ExternalLink, Info } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { SelectedElement, TourStep } from '@/types/visualBuilder';
 import { ScannedElement } from './ElementsPanel';
-
+import { StepOverlay } from './StepOverlay';
 interface IframeContainerProps {
   url: string;
   mode?: 'direct' | 'proxy';
@@ -13,7 +13,9 @@ interface IframeContainerProps {
   highlightSelector?: string;
   isPreviewMode?: boolean;
   previewStep?: TourStep | null;
-  onPreviewAction?: (action: 'next' | 'skip') => void;
+  previewStepIndex?: number;
+  totalSteps?: number;
+  onPreviewAction?: (action: 'next' | 'prev' | 'exit') => void;
   onElementsScanned?: (elements: ScannedElement[]) => void;
 }
 
@@ -38,6 +40,8 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
   highlightSelector,
   isPreviewMode = false,
   previewStep,
+  previewStepIndex = 0,
+  totalSteps = 0,
   onPreviewAction,
   onElementsScanned,
 }, ref) => {
@@ -110,7 +114,7 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
           
         case 'PREVIEW_ACTION':
           if (onPreviewAction && data.action) {
-            onPreviewAction(data.action as 'next' | 'skip');
+            onPreviewAction(data.action as 'next' | 'prev' | 'exit');
           }
           break;
           
@@ -307,6 +311,18 @@ export const IframeContainer = forwardRef<IframeContainerRef, IframeContainerPro
               onLoad={handleIframeLoad}
               onError={handleIframeError}
               title="Visual Builder Preview"
+            />
+          )}
+
+          {/* Step Overlay for Preview Mode */}
+          {isPreviewMode && previewStep && loadingState === 'ready' && (
+            <StepOverlay
+              step={previewStep}
+              currentIndex={previewStepIndex}
+              totalSteps={totalSteps}
+              onNext={() => onPreviewAction?.('next')}
+              onPrev={() => onPreviewAction?.('prev')}
+              onExit={() => onPreviewAction?.('exit')}
             />
           )}
         </>

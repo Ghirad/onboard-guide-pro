@@ -609,11 +609,15 @@ export default function VisualTourBuilder() {
     }));
   }, []);
 
-  const handlePreviewAction = useCallback((action: 'next' | 'skip') => {
-    if (action === 'next' || action === 'skip') {
+  const handlePreviewAction = useCallback((action: 'next' | 'prev' | 'exit') => {
+    if (action === 'next') {
       handleNextPreviewStep();
+    } else if (action === 'prev') {
+      handlePrevPreviewStep();
+    } else if (action === 'exit') {
+      handleExitPreview();
     }
-  }, [handleNextPreviewStep]);
+  }, [handleNextPreviewStep, handlePrevPreviewStep, handleExitPreview]);
 
   const handleTogglePreviewMode = useCallback(() => {
     if (state.isPreviewMode) {
@@ -734,6 +738,8 @@ export default function VisualTourBuilder() {
             highlightSelector={highlightSelector || undefined}
             isPreviewMode={state.isPreviewMode}
             previewStep={currentPreviewStep}
+            previewStepIndex={state.previewStepIndex}
+            totalSteps={state.steps.length}
             onPreviewAction={handlePreviewAction}
             onElementsScanned={handleElementsScanned}
           />
