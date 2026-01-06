@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { Check, Palette } from 'lucide-react';
+import { Check, Palette, Sparkles } from 'lucide-react';
 
 export interface ThemeConfig {
   template: string;
@@ -89,6 +89,24 @@ const THEME_TEMPLATES: ThemeTemplate[] = [
   }
 ];
 
+const HIGHLIGHT_ANIMATIONS = [
+  {
+    id: 'pulse',
+    name: 'Pulse',
+    description: 'Pulsação suave'
+  },
+  {
+    id: 'glow',
+    name: 'Glow',
+    description: 'Brilho radiante'
+  },
+  {
+    id: 'border',
+    name: 'Border',
+    description: 'Borda animada'
+  }
+];
+
 interface ThemeSelectorProps {
   value: ThemeConfig;
   onChange: (theme: ThemeConfig) => void;
@@ -96,8 +114,12 @@ interface ThemeSelectorProps {
 
 export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
   const [useCustomColors, setUseCustomColors] = useState(false);
+  const [animatingTemplate, setAnimatingTemplate] = useState<string | null>(null);
 
   const handleTemplateSelect = (template: ThemeTemplate) => {
+    setAnimatingTemplate(template.id);
+    setTimeout(() => setAnimatingTemplate(null), 500);
+    
     onChange({
       template: template.id,
       primaryColor: template.primaryColor,
@@ -115,7 +137,24 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
     setUseCustomColors(true);
   };
 
-  const selectedTemplate = THEME_TEMPLATES.find(t => t.id === value.template);
+  const handleAnimationChange = (animationId: string) => {
+    onChange({ ...value, highlightAnimation: animationId });
+  };
+
+  const getHighlightStyle = (animationId: string, color: string) => {
+    const baseStyle = {
+      border: `3px solid ${color}`,
+    };
+    
+    if (animationId === 'glow') {
+      return {
+        ...baseStyle,
+        boxShadow: `0 0 15px ${color}80`,
+      };
+    }
+    
+    return baseStyle;
+  };
 
   return (
     <div className="space-y-6">
@@ -131,21 +170,22 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
               key={template.id}
               onClick={() => handleTemplateSelect(template)}
               className={cn(
-                "relative p-3 rounded-lg border-2 transition-all text-left",
+                "relative p-3 rounded-lg border-2 transition-all duration-300 text-left",
                 value.template === template.id && !useCustomColors
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "border-border hover:border-primary/50"
+                  ? "border-primary ring-2 ring-primary/20 scale-[1.02]"
+                  : "border-border hover:border-primary/50 hover:scale-[1.01]",
+                animatingTemplate === template.id && "animate-template-select"
               )}
             >
               {/* Preview */}
               <div 
-                className="h-12 rounded-md mb-2 flex items-center justify-center"
+                className="h-12 rounded-md mb-2 flex items-center justify-center transition-transform duration-300"
                 style={{ 
                   background: `linear-gradient(135deg, ${template.primaryColor} 0%, ${template.secondaryColor} 100%)` 
                 }}
               >
                 <div 
-                  className="w-8 h-6 rounded shadow-sm flex items-center justify-center"
+                  className="w-8 h-6 rounded shadow-sm flex items-center justify-center transition-all duration-300"
                   style={{ 
                     backgroundColor: template.backgroundColor,
                     color: template.textColor
@@ -160,8 +200,57 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
               
               {/* Selected indicator */}
               {value.template === template.id && !useCustomColors && (
-                <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center animate-scale-in">
                   <Check className="h-3 w-3 text-primary-foreground" />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Highlight Animation Selector */}
+      <div className="space-y-3">
+        <Label className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4" />
+          Animação de Destaque
+        </Label>
+        <div className="grid grid-cols-3 gap-3">
+          {HIGHLIGHT_ANIMATIONS.map((anim) => (
+            <button
+              key={anim.id}
+              onClick={() => handleAnimationChange(anim.id)}
+              className={cn(
+                "relative p-3 rounded-lg border-2 transition-all duration-200",
+                value.highlightAnimation === anim.id
+                  ? "border-primary bg-primary/5 scale-[1.02]"
+                  : "border-border hover:border-primary/50"
+              )}
+            >
+              {/* Animated Preview */}
+              <div className="h-10 mb-2 flex items-center justify-center">
+                <div 
+                  className={cn(
+                    "w-14 h-7 rounded bg-muted/50 relative",
+                  )}
+                >
+                  <div 
+                    className={cn(
+                      "absolute inset-0 rounded pointer-events-none",
+                      anim.id === 'pulse' && "animate-highlight-pulse",
+                      anim.id === 'glow' && "animate-highlight-glow",
+                      anim.id === 'border' && "animate-highlight-border"
+                    )}
+                    style={getHighlightStyle(anim.id, value.primaryColor)}
+                  />
+                </div>
+              </div>
+              <span className="text-xs font-medium block text-center">{anim.name}</span>
+              <span className="text-[10px] text-muted-foreground block text-center">{anim.description}</span>
+              
+              {value.highlightAnimation === anim.id && (
+                <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center animate-scale-in">
+                  <Check className="h-2.5 w-2.5 text-primary-foreground" />
                 </div>
               )}
             </button>
@@ -185,7 +274,7 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
 
       {/* Custom Colors */}
       {useCustomColors && (
-        <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+        <div className="space-y-4 p-4 rounded-lg border bg-muted/30 animate-fade-in">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="primary-color" className="text-xs">Cor Primária</Label>
@@ -280,25 +369,21 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
           >
             <span>Elemento do site</span>
             
-            {/* Highlight preview */}
+            {/* Highlight preview with selected animation */}
             <div 
               className={cn(
-                "absolute inset-0 rounded pointer-events-none",
-                value.highlightAnimation === 'pulse' && "animate-pulse",
-                value.highlightAnimation === 'glow' && "animate-glow"
+                "absolute inset-0 rounded pointer-events-none transition-all duration-300",
+                value.highlightAnimation === 'pulse' && "animate-highlight-pulse",
+                value.highlightAnimation === 'glow' && "animate-highlight-glow",
+                value.highlightAnimation === 'border' && "animate-highlight-border"
               )}
-              style={{ 
-                border: `3px solid ${value.primaryColor}`,
-                boxShadow: value.highlightAnimation === 'glow' 
-                  ? `0 0 20px ${value.primaryColor}60`
-                  : undefined
-              }}
+              style={getHighlightStyle(value.highlightAnimation, value.primaryColor)}
             />
           </div>
           
           {/* Tooltip preview */}
           <div 
-            className="absolute -top-2 left-1/2 transform -translate-x-1/2 p-3 rounded-lg shadow-lg min-w-[180px]"
+            className="absolute -top-2 left-1/2 transform -translate-x-1/2 p-3 rounded-lg shadow-lg min-w-[180px] transition-all duration-300"
             style={{ 
               backgroundColor: value.backgroundColor,
               color: value.textColor
@@ -318,7 +403,7 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
             <p className="text-[10px] opacity-70 mb-2">Descrição de exemplo</p>
             <div className="flex gap-1.5 justify-end">
               <button 
-                className="px-2 py-0.5 text-[9px] rounded"
+                className="px-2 py-0.5 text-[9px] rounded transition-colors duration-200"
                 style={{ 
                   backgroundColor: `${value.primaryColor}15`,
                   color: value.textColor
@@ -327,7 +412,7 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
                 Pular
               </button>
               <button 
-                className="px-2 py-0.5 text-[9px] rounded text-white"
+                className="px-2 py-0.5 text-[9px] rounded text-white transition-colors duration-200"
                 style={{ 
                   background: `linear-gradient(135deg, ${value.primaryColor}, ${value.secondaryColor})` 
                 }}
