@@ -438,12 +438,17 @@ const widgetScript = `
     _fetchConfiguration: function() {
       var self = this;
       var baseUrl = 'https://ukjpxeptefznpwduwled.supabase.co';
-      var url = baseUrl + '/functions/v1/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey);
+      // Add cache buster to prevent stale configuration
+      var cacheBuster = '_t=' + Date.now();
+      var url = baseUrl + '/functions/v1/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey) + '&' + cacheBuster;
+      
+      console.log('[AutoSetup] Fetching configuration (no-cache):', url);
       
       return fetch(url, {
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        cache: 'no-store'
       })
       .then(function(response) {
         if (!response.ok) throw new Error('Failed to fetch configuration');
@@ -775,6 +780,9 @@ const widgetScript = `
         return;
       }
       
+      // Log tooltip position for debugging
+      console.log('[AutoSetup] Rendering tooltip for step:', step.title, '| Position from DB:', step.tooltip_position);
+      
       // Scroll element into view first
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       
@@ -786,7 +794,9 @@ const widgetScript = `
       // Small delay to allow scroll to complete
       setTimeout(function() {
         var rect = el.getBoundingClientRect();
+        console.log('[AutoSetup] Element rect:', rect, '| Preferred position:', step.tooltip_position);
         var position = self._calculateTooltipPosition(rect, step.tooltip_position);
+        console.log('[AutoSetup] Calculated position:', position);
         var isLastStep = self._currentStepIndex === self._steps.length - 1;
         var buttonText = isLastStep ? 'Finalizar' : 'Próximo';
         
@@ -860,69 +870,161 @@ const widgetScript = `
       var viewportWidth = window.innerWidth;
       var viewportHeight = window.innerHeight;
       var tooltipWidth = 320;
-      var tooltipHeight = 180; // estimated
+      var tooltipHeight = 200; // slightly larger estimate
       var gap = 16;
       
-      var position = 'bottom';
+      console.log('[AutoSetup] _calculateTooltipPosition called with preferredPosition:', preferredPosition);
+      
+      var position = preferredPosition || 'auto';
       var left, top;
       var arrowPosition = 'top';
+      var arrowOffset = null; // For custom arrow positioning when clamped
       
-      // Use preferred position if specified and not 'auto'
-      if (preferredPosition && preferredPosition !== 'auto') {
-        position = preferredPosition;
+      // Helper to check if position fits
+      var fitsBottom = function() { return rect.bottom + tooltipHeight + gap < viewportHeight; };
+      var fitsTop = function() { return rect.top - tooltipHeight - gap > 0; };
+      var fitsRight = function() { return rect.right + tooltipWidth + gap < viewportWidth; };
+      var fitsLeft = function() { return rect.left - tooltipWidth - gap > 0; };
+      
+      // Calculate position based on preference
+      if (position === 'left') {
+        // Position to the left of element, vertically centered
+        left = rect.left - tooltipWidth - gap;
+        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+        arrowPosition = 'left';
         
-        if (position === 'bottom') {
-          top = rect.bottom + gap;
-          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-          arrowPosition = 'bottom';
-        } else if (position === 'top') {
-          top = rect.top - tooltipHeight - gap;
-          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-          arrowPosition = 'top';
-        } else if (position === 'right') {
-          left = rect.right + gap;
-          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          arrowPosition = 'right';
-        } else if (position === 'left') {
-          left = rect.left - tooltipWidth - gap;
-          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          arrowPosition = 'left';
+        // If doesn't fit left, try fallback
+        if (!fitsLeft()) {
+          console.log('[AutoSetup] Left doesnt fit, trying right');
+          if (fitsRight()) {
+            left = rect.right + gap;
+            arrowPosition = 'right';
+            position = 'right';
+          } else if (fitsBottom()) {
+            top = rect.bottom + gap;
+            left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+            arrowPosition = 'bottom';
+            position = 'bottom';
+          } else {
+            top = rect.top - tooltipHeight - gap;
+            left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+            arrowPosition = 'top';
+            position = 'top';
+          }
+        }
+      } else if (position === 'right') {
+        left = rect.right + gap;
+        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+        arrowPosition = 'right';
+        
+        if (!fitsRight()) {
+          console.log('[AutoSetup] Right doesnt fit, trying left');
+          if (fitsLeft()) {
+            left = rect.left - tooltipWidth - gap;
+            arrowPosition = 'left';
+            position = 'left';
+          } else if (fitsBottom()) {
+            top = rect.bottom + gap;
+            left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+            arrowPosition = 'bottom';
+            position = 'bottom';
+          } else {
+            top = rect.top - tooltipHeight - gap;
+            left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+            arrowPosition = 'top';
+            position = 'top';
+          }
+        }
+      } else if (position === 'top') {
+        top = rect.top - tooltipHeight - gap;
+        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        arrowPosition = 'top';
+        
+        if (!fitsTop()) {
+          console.log('[AutoSetup] Top doesnt fit, trying bottom');
+          if (fitsBottom()) {
+            top = rect.bottom + gap;
+            arrowPosition = 'bottom';
+            position = 'bottom';
+          }
+        }
+      } else if (position === 'bottom') {
+        top = rect.bottom + gap;
+        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        arrowPosition = 'bottom';
+        
+        if (!fitsBottom()) {
+          console.log('[AutoSetup] Bottom doesnt fit, trying top');
+          if (fitsTop()) {
+            top = rect.top - tooltipHeight - gap;
+            arrowPosition = 'top';
+            position = 'top';
+          }
         }
       } else {
-        // Auto-calculate position based on available space
-        if (rect.bottom + tooltipHeight + gap < viewportHeight) {
+        // Auto mode: choose best position based on available space
+        if (fitsBottom()) {
           position = 'bottom';
           top = rect.bottom + gap;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
           arrowPosition = 'bottom';
-        } 
-        else if (rect.top - tooltipHeight - gap > 0) {
+        } else if (fitsTop()) {
           position = 'top';
           top = rect.top - tooltipHeight - gap;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
           arrowPosition = 'top';
-        }
-        else if (rect.right + tooltipWidth + gap < viewportWidth) {
+        } else if (fitsRight()) {
           position = 'right';
           left = rect.right + gap;
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
           arrowPosition = 'right';
-        }
-        else {
+        } else if (fitsLeft()) {
           position = 'left';
           left = rect.left - tooltipWidth - gap;
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
           arrowPosition = 'left';
+        } else {
+          // Fallback: place below even if it might overflow
+          position = 'bottom';
+          top = rect.bottom + gap;
+          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          arrowPosition = 'bottom';
         }
       }
       
-      // Keep within viewport
+      // Calculate arrow offset before clamping (for accurate arrow pointing)
+      var originalTop = top;
+      var originalLeft = left;
+      
+      // Clamp to viewport
       left = Math.max(10, Math.min(left, viewportWidth - tooltipWidth - 10));
       top = Math.max(10, Math.min(top, viewportHeight - tooltipHeight - 10));
+      
+      // Calculate arrow offset if tooltip was clamped (for horizontal positions)
+      if (arrowPosition === 'left' || arrowPosition === 'right') {
+        var verticalShift = top - originalTop;
+        if (Math.abs(verticalShift) > 5) {
+          // Calculate where arrow should point (element center relative to tooltip)
+          var elementCenterY = rect.top + rect.height / 2;
+          var tooltipTop = top;
+          arrowOffset = Math.max(20, Math.min(tooltipHeight - 20, elementCenterY - tooltipTop));
+        }
+      } else if (arrowPosition === 'top' || arrowPosition === 'bottom') {
+        var horizontalShift = left - originalLeft;
+        if (Math.abs(horizontalShift) > 5) {
+          // Calculate where arrow should point
+          var elementCenterX = rect.left + rect.width / 2;
+          var tooltipLeft = left;
+          arrowOffset = Math.max(20, Math.min(tooltipWidth - 20, elementCenterX - tooltipLeft));
+        }
+      }
+      
+      console.log('[AutoSetup] Final position:', position, '| Arrow:', arrowPosition, '| left:', left, '| top:', top);
       
       return {
         position: position,
         arrowPosition: arrowPosition,
+        arrowOffset: arrowOffset,
         style: 'left:' + left + 'px;top:' + top + 'px;'
       };
     },
@@ -1381,7 +1483,7 @@ Deno.serve(async (req) => {
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/javascript',
-      'Cache-Control': 'public, max-age=60', // Reduced cache for easier debugging
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     },
   });
 });
