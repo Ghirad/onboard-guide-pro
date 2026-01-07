@@ -122,7 +122,7 @@ export default function VisualTourBuilder() {
           config: {
             title: step.title,
             description: step.description || '',
-            position: 'auto',
+            position: (step as any).tooltip_position || 'auto',
             delayMs: firstAction?.delay_ms || undefined,
             highlightColor: firstAction?.highlight_color || undefined,
             highlightAnimation: firstAction?.highlight_animation || undefined,
