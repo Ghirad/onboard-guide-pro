@@ -23,6 +23,7 @@ const widgetScript = `
     _routeObserverActive: false,
     _isInitialized: false,
     _targetClickHandler: null,
+    _navigationTarget: null,
 
     init: function(options) {
       this._config = {
@@ -187,6 +188,110 @@ const widgetScript = `
       }
     },
 
+    // Navigate to step with guidance for pending steps
+    navigateToStep: function(targetIndex) {
+      if (targetIndex < 0 || targetIndex >= this._steps.length) return;
+      
+      // If going backwards or to current step, just go directly
+      if (targetIndex <= this._currentStepIndex) {
+        this.goToStep(targetIndex);
+        return;
+      }
+      
+      var pendingSteps = this._getPendingStepsBefore(targetIndex);
+      
+      if (pendingSteps.length === 0) {
+        // No pending steps, go directly
+        this.goToStep(targetIndex);
+        return;
+      }
+      
+      // Show navigation modal
+      this._renderNavigationModal(targetIndex, pendingSteps);
+    },
+
+    _getPendingStepsBefore: function(targetIndex) {
+      var pending = [];
+      for (var i = this._currentStepIndex; i < targetIndex; i++) {
+        var step = this._steps[i];
+        var progress = this._progress[step.id];
+        if (!progress || (progress.status !== 'completed' && progress.status !== 'skipped')) {
+          pending.push({ index: i, step: step });
+        }
+      }
+      return pending;
+    },
+
+    _skipAllToStep: function(targetIndex) {
+      for (var i = this._currentStepIndex; i < targetIndex; i++) {
+        var step = this._steps[i];
+        if (!this._progress[step.id] || this._progress[step.id].status === 'pending') {
+          this._progress[step.id] = { status: 'skipped', skippedAt: new Date().toISOString() };
+        }
+      }
+      this._saveProgress();
+      this._closeNavigationModal();
+      this.goToStep(targetIndex);
+    },
+
+    _startGuidedNavigation: function(targetIndex) {
+      this._navigationTarget = targetIndex;
+      var pendingSteps = this._getPendingStepsBefore(targetIndex);
+      this._closeNavigationModal();
+      
+      if (pendingSteps.length > 0) {
+        this.goToStep(pendingSteps[0].index);
+      } else {
+        this.goToStep(targetIndex);
+      }
+    },
+
+    _renderNavigationModal: function(targetIndex, pendingSteps) {
+      var self = this;
+      var targetStep = this._steps[targetIndex];
+      
+      var existingModal = document.getElementById('autosetup-navigation-modal');
+      if (existingModal) existingModal.remove();
+      
+      var modal = document.createElement('div');
+      modal.id = 'autosetup-navigation-modal';
+      modal.className = 'autosetup-navigation-modal';
+      modal.onclick = function(e) { if (e.target === modal) self._closeNavigationModal(); };
+      
+      var pendingListHtml = '<div class="autosetup-navigation-pending-list">';
+      for (var i = 0; i < pendingSteps.length; i++) {
+        var ps = pendingSteps[i];
+        pendingListHtml += '<div class="autosetup-navigation-pending-item">⏳ Passo ' + (ps.index + 1) + ': ' + this._escapeHtml(ps.step.title) + '</div>';
+      }
+      pendingListHtml += '</div>';
+      
+      var firstPendingIndex = pendingSteps[0].index;
+      
+      modal.innerHTML = 
+        '<div class="autosetup-navigation-content">' +
+          '<div class="autosetup-navigation-header">' +
+            '<h3>🚀 Navegação para Passo ' + (targetIndex + 1) + '</h3>' +
+            '<p>Para chegar ao passo "<strong>' + this._escapeHtml(targetStep.title) + '</strong>", você precisa passar por:</p>' +
+          '</div>' +
+          '<div class="autosetup-navigation-body">' +
+            pendingListHtml +
+          '</div>' +
+          '<div class="autosetup-navigation-question">Como deseja prosseguir?</div>' +
+          '<div class="autosetup-navigation-footer">' +
+            '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup._closeNavigationModal()">Cancelar</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup._skipAllToStep(' + targetIndex + ')">Pular todos</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup._startGuidedNavigation(' + targetIndex + ')">Começar pelo Passo ' + (firstPendingIndex + 1) + ' →</button>' +
+          '</div>' +
+        '</div>';
+      
+      document.body.appendChild(modal);
+    },
+
+    _closeNavigationModal: function() {
+      var modal = document.getElementById('autosetup-navigation-modal');
+      if (modal) modal.remove();
+    },
+
     completeStep: function() {
       var step = this._steps[this._currentStepIndex];
       if (step) {
@@ -198,8 +303,16 @@ const widgetScript = `
 
         if (this._currentStepIndex < this._steps.length - 1) {
           this._currentStepIndex++;
+          
+          // Check if we reached navigation target
+          if (this._navigationTarget !== null && this._currentStepIndex >= this._navigationTarget) {
+            this._emit('navigationComplete', { targetStep: this._navigationTarget });
+            this._navigationTarget = null;
+          }
+          
           this._render();
         } else {
+          this._navigationTarget = null;
           this._emit('complete', { progress: this._progress });
           this._renderComplete();
         }
@@ -217,8 +330,16 @@ const widgetScript = `
 
         if (this._currentStepIndex < this._steps.length - 1) {
           this._currentStepIndex++;
+          
+          // Check if we reached navigation target
+          if (this._navigationTarget !== null && this._currentStepIndex >= this._navigationTarget) {
+            this._emit('navigationComplete', { targetStep: this._navigationTarget });
+            this._navigationTarget = null;
+          }
+          
           this._render();
         } else {
+          this._navigationTarget = null;
           this._emit('complete', { progress: this._progress });
           this._renderComplete();
         }
@@ -516,6 +637,20 @@ const widgetScript = `
         .autosetup-preview-prereq-item.skipped { color: #9ca3af; }
         .autosetup-preview-prereq-item.pending { color: #f59e0b; }
         .autosetup-preview-footer { padding: 16px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end; }
+        
+        /* Navigation Modal styles */
+        .autosetup-navigation-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2147483651; backdrop-filter: blur(4px); }
+        .autosetup-navigation-content { background: var(--autosetup-bg); border-radius: 16px; max-width: 480px; width: 90%; color: var(--autosetup-text); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; }
+        .autosetup-navigation-header { padding: 20px; border-bottom: 1px solid #e5e7eb; }
+        .autosetup-navigation-header h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+        .autosetup-navigation-header p { margin: 0; font-size: 14px; color: #6b7280; line-height: 1.5; }
+        .autosetup-navigation-header strong { color: var(--autosetup-text); }
+        .autosetup-navigation-body { padding: 16px 20px; }
+        .autosetup-navigation-pending-list { display: flex; flex-direction: column; gap: 8px; }
+        .autosetup-navigation-pending-item { padding: 10px 12px; background: #fef3c7; border-radius: 8px; font-size: 13px; color: #92400e; display: flex; align-items: center; gap: 8px; }
+        .autosetup-navigation-question { padding: 0 20px 16px; font-size: 14px; font-weight: 500; color: #374151; }
+        .autosetup-navigation-footer { padding: 16px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+        .autosetup-navigation-footer .autosetup-btn { font-size: 13px; }
       \`;
     },
 
@@ -969,7 +1104,7 @@ const widgetScript = `
           '</div>' +
           '<div class="autosetup-preview-footer">' +
             '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup._closePreviewModal()">Fechar</button>' +
-            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.goToStep(' + stepIndex + ');AutoSetup._closePreviewModal()">Ir para este passo →</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup._closePreviewModal();AutoSetup.navigateToStep(' + stepIndex + ')">Ir para este passo →</button>' +
           '</div>' +
         '</div>';
       
