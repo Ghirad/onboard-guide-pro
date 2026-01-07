@@ -33,7 +33,11 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
     configId: '${config.id}',
     apiKey: '${config.api_key}',
     position: '${config.widget_position}',
-    autoStart: ${config.auto_start}${allowedRoutes.length > 0 ? `,
+    autoStart: ${config.auto_start},
+    
+    // Identificação do usuário (substitua pelos dados do seu sistema)
+    userId: 'ID_UNICO_DO_USUARIO',      // ID único do usuário no seu sistema
+    userName: 'NOME_DO_USUARIO'         // Nome do usuário para personalização${allowedRoutes.length > 0 ? `,
     allowedRoutes: ${JSON.stringify(allowedRoutes)}` : ''}
   });
 </script>`;

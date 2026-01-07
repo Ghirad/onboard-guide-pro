@@ -22,8 +22,12 @@ export function CodeGenerator({ config }: CodeGeneratorProps) {
     configId: '${config.id}',
     apiKey: '${config.api_key}',
     position: '${config.widget_position}',
-    autoStart: ${config.auto_start}
-    // allowedRoutes is configured in the dashboard and fetched automatically
+    autoStart: ${config.auto_start},
+    
+    // Identificação do usuário (substitua pelos dados do seu sistema)
+    userId: 'ID_UNICO_DO_USUARIO',      // ID único do usuário no seu sistema
+    userName: 'NOME_DO_USUARIO'         // Nome do usuário para personalização
+    // allowedRoutes é configurado no dashboard e buscado automaticamente
   });
 </script>`;
 
