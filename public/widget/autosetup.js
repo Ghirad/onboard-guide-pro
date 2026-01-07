@@ -22,6 +22,12 @@
     _actionAbortController: null,
 
     init: function(options) {
+      // Verificar se tem.auto.setup foi passado como true
+      if (options['tem.auto.setup'] !== true) {
+        console.log('[AutoSetup] Widget disabled - tem.auto.setup not set to true');
+        return Promise.resolve(null);
+      }
+
       if (!options.configId || !options.apiKey) {
         console.error('[AutoSetup] configId and apiKey are required');
         return Promise.reject(new Error('configId and apiKey are required'));

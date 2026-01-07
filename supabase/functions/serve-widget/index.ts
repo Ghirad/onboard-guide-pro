@@ -30,6 +30,13 @@ const widgetScript = `
 
     init: function(options) {
       var self = this;
+      
+      // Verificar se tem.auto.setup foi passado como true
+      if (options['tem.auto.setup'] !== true) {
+        console.log('[AutoSetup] Widget disabled - tem.auto.setup not set to true');
+        return null;
+      }
+      
       this._config = {
         configId: options.configId,
         apiKey: options.apiKey,
@@ -37,7 +44,6 @@ const widgetScript = `
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
         actionDelay: options.actionDelay || 300,
-        allowedRoutes: options.allowedRoutes || null,
         autoAdvanceOnClick: options.autoAdvanceOnClick !== false
       };
 
@@ -49,17 +55,8 @@ const widgetScript = `
       
       console.log('[AutoSetup] Initializing with configId:', this._config.configId);
       
-      // Fetch configuration first to get allowed_routes from backend
+      // Fetch configuration
       this._fetchConfiguration().then(function() {
-        // Now check if widget should show on current route
-        if (!self._shouldShowOnCurrentRoute()) {
-          console.log('[AutoSetup] Widget not configured for this route:', window.location.pathname);
-          console.log('[AutoSetup] Allowed routes:', self._config.allowedRoutes);
-          // Setup route observer to show widget when navigating to allowed route
-          self._setupRouteObserver();
-          return;
-        }
-
         // Ensure body is ready before initializing widget
         self._ensureBodyReady(function() {
           self._initializeWidget();
@@ -94,92 +91,7 @@ const widgetScript = `
       if (this._config.autoStart) {
         this._render();
       }
-      this._setupRouteObserver();
       this._emit('ready', { config: this._config });
-    },
-
-    _setupRouteObserver: function() {
-      if (this._routeObserverActive) return;
-      this._routeObserverActive = true;
-      
-      var self = this;
-      
-      // Listen for popstate (back/forward navigation)
-      window.addEventListener('popstate', function() {
-        self._handleRouteChange();
-      });
-      
-      // Intercept pushState and replaceState for SPA navigation
-      var originalPushState = history.pushState;
-      var originalReplaceState = history.replaceState;
-      
-      history.pushState = function() {
-        originalPushState.apply(history, arguments);
-        self._handleRouteChange();
-      };
-      
-      history.replaceState = function() {
-        originalReplaceState.apply(history, arguments);
-        self._handleRouteChange();
-      };
-      
-      console.log('[AutoSetup] Route observer active');
-    },
-
-    _handleRouteChange: function() {
-      var shouldShow = this._shouldShowOnCurrentRoute();
-      console.log('[AutoSetup] Route changed to:', window.location.pathname, '| Should show:', shouldShow);
-      
-      if (shouldShow && !this._isInitialized) {
-        // Widget should show and is not initialized yet
-        this._initializeWidget();
-      } else if (shouldShow && this._container && !this._container.innerHTML) {
-        // Widget is initialized but hidden, render it
-        this._render();
-      } else if (!shouldShow && this._container) {
-        // Widget should not show, hide it
-        this._container.innerHTML = '';
-        this._removeHighlight();
-        this._removeTooltip();
-      }
-    },
-
-    _shouldShowOnCurrentRoute: function() {
-      var routes = this._config.allowedRoutes;
-      
-      // If no routes specified or empty array, show on all pages
-      if (!routes || routes.length === 0) {
-        console.log('[AutoSetup] No route restrictions, showing on all pages');
-        return true;
-      }
-      
-      var currentPath = window.location.pathname.toLowerCase();
-      console.log('[AutoSetup] Checking route:', currentPath, 'against allowed:', routes);
-      
-      for (var i = 0; i < routes.length; i++) {
-        var route = routes[i].toLowerCase();
-        
-        // Wildcard support: /painel/*
-        if (route.endsWith('/*')) {
-          var prefix = route.slice(0, -1); // Remove the *
-          if (currentPath.startsWith(prefix)) {
-            console.log('[AutoSetup] Route matched wildcard:', route);
-            return true;
-          }
-        } 
-        // Exact match (with or without trailing slash)
-        else {
-          if (currentPath === route || 
-              currentPath === route + '/' ||
-              currentPath + '/' === route) {
-            console.log('[AutoSetup] Route matched exactly:', route);
-            return true;
-          }
-        }
-      }
-      
-      console.log('[AutoSetup] No route matched');
-      return false;
     },
 
     start: function() {

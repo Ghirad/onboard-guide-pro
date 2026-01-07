@@ -23,9 +23,6 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
   const [widgetPosition, setWidgetPosition] = useState(configuration.widget_position || 'bottom-right');
   const [autoStart, setAutoStart] = useState(configuration.auto_start ?? true);
   const [isActive, setIsActive] = useState(configuration.is_active ?? true);
-  const [allowedRoutes, setAllowedRoutes] = useState<string[]>(
-    (configuration as any).allowed_routes || []
-  );
   
   // Theme state
   const [theme, setTheme] = useState<ThemeConfig>({
@@ -47,7 +44,7 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     setWidgetPosition(configuration.widget_position || 'bottom-right');
     setAutoStart(configuration.auto_start ?? true);
     setIsActive(configuration.is_active ?? true);
-    setAllowedRoutes((configuration as any).allowed_routes || []);
+    
     setTheme({
       template: (configuration as any).theme_template || 'modern',
       primaryColor: (configuration as any).theme_primary_color || '#6366f1',
@@ -68,7 +65,6 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
       widget_position: widgetPosition,
       auto_start: autoStart,
       is_active: isActive,
-      allowed_routes: allowedRoutes,
       theme_template: theme.template,
       theme_primary_color: theme.primaryColor,
       theme_secondary_color: theme.secondaryColor,
@@ -80,7 +76,6 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     } as any);
   };
 
-  const currentAllowedRoutes = (configuration as any).allowed_routes || [];
   const currentActionTypeStyles = (configuration as any).action_type_styles || {};
   const hasChanges = 
     name !== configuration.name ||
@@ -89,7 +84,6 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
     widgetPosition !== (configuration.widget_position || 'bottom-right') ||
     autoStart !== (configuration.auto_start ?? true) ||
     isActive !== (configuration.is_active ?? true) ||
-    JSON.stringify(allowedRoutes) !== JSON.stringify(currentAllowedRoutes) ||
     theme.template !== ((configuration as any).theme_template || 'modern') ||
     theme.primaryColor !== ((configuration as any).theme_primary_color || '#6366f1') ||
     theme.secondaryColor !== ((configuration as any).theme_secondary_color || '#8b5cf6') ||
@@ -194,21 +188,6 @@ export function SettingsPanel({ configuration, onUpdate, isSaving }: SettingsPan
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="allowed-routes">Rotas Permitidas</Label>
-              <Textarea
-                id="allowed-routes"
-                value={allowedRoutes.join('\n')}
-                onChange={(e) => setAllowedRoutes(
-                  e.target.value.split('\n').map(r => r.trim()).filter(r => r)
-                )}
-                placeholder="/Painel&#10;/dashboard/*&#10;/app/settings"
-                rows={4}
-              />
-              <p className="text-xs text-muted-foreground">
-                Uma rota por linha. Use * para wildcards (ex: /painel/*). Deixe vazio para todas as páginas.
-              </p>
-            </div>
           </TabsContent>
 
           <TabsContent value="appearance" className="p-4 mt-0">
