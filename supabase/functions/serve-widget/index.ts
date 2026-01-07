@@ -891,104 +891,105 @@ const widgetScript = `
         // Position to the left of element, vertically centered
         left = rect.left - tooltipWidth - gap;
         top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-        arrowPosition = 'left';
+        arrowPosition = 'right'; // Arrow points RIGHT toward the element
         
         // If doesn't fit left, try fallback
         if (!fitsLeft()) {
-          console.log('[AutoSetup] Left doesnt fit, trying right');
+          console.log('[AutoSetup] Left doesnt fit, trying right. rect.left:', rect.left, 'needed:', tooltipWidth + gap);
           if (fitsRight()) {
             left = rect.right + gap;
-            arrowPosition = 'right';
+            arrowPosition = 'left'; // Arrow points LEFT toward the element
             position = 'right';
           } else if (fitsBottom()) {
             top = rect.bottom + gap;
             left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-            arrowPosition = 'bottom';
+            arrowPosition = 'top'; // Arrow points UP toward the element
             position = 'bottom';
           } else {
             top = rect.top - tooltipHeight - gap;
             left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-            arrowPosition = 'top';
+            arrowPosition = 'bottom'; // Arrow points DOWN toward the element
             position = 'top';
           }
         }
       } else if (position === 'right') {
         left = rect.right + gap;
         top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-        arrowPosition = 'right';
+        arrowPosition = 'left'; // Arrow points LEFT toward the element
         
         if (!fitsRight()) {
           console.log('[AutoSetup] Right doesnt fit, trying left');
           if (fitsLeft()) {
             left = rect.left - tooltipWidth - gap;
-            arrowPosition = 'left';
+            arrowPosition = 'right'; // Arrow points RIGHT toward the element
             position = 'left';
           } else if (fitsBottom()) {
             top = rect.bottom + gap;
             left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-            arrowPosition = 'bottom';
+            arrowPosition = 'top'; // Arrow points UP toward the element
             position = 'bottom';
           } else {
             top = rect.top - tooltipHeight - gap;
             left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-            arrowPosition = 'top';
+            arrowPosition = 'bottom'; // Arrow points DOWN toward the element
             position = 'top';
           }
         }
       } else if (position === 'top') {
         top = rect.top - tooltipHeight - gap;
         left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-        arrowPosition = 'top';
+        arrowPosition = 'bottom'; // Arrow points DOWN toward the element
         
         if (!fitsTop()) {
           console.log('[AutoSetup] Top doesnt fit, trying bottom');
           if (fitsBottom()) {
             top = rect.bottom + gap;
-            arrowPosition = 'bottom';
+            arrowPosition = 'top'; // Arrow points UP toward the element
             position = 'bottom';
           }
         }
       } else if (position === 'bottom') {
         top = rect.bottom + gap;
         left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-        arrowPosition = 'bottom';
+        arrowPosition = 'top'; // Arrow points UP toward the element
         
         if (!fitsBottom()) {
           console.log('[AutoSetup] Bottom doesnt fit, trying top');
           if (fitsTop()) {
             top = rect.top - tooltipHeight - gap;
-            arrowPosition = 'top';
+            arrowPosition = 'bottom'; // Arrow points DOWN toward the element
             position = 'top';
           }
         }
+      }
       } else {
         // Auto mode: choose best position based on available space
         if (fitsBottom()) {
           position = 'bottom';
           top = rect.bottom + gap;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-          arrowPosition = 'bottom';
+          arrowPosition = 'top'; // Arrow points UP toward the element
         } else if (fitsTop()) {
           position = 'top';
           top = rect.top - tooltipHeight - gap;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-          arrowPosition = 'top';
+          arrowPosition = 'bottom'; // Arrow points DOWN toward the element
         } else if (fitsRight()) {
           position = 'right';
           left = rect.right + gap;
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          arrowPosition = 'right';
+          arrowPosition = 'left'; // Arrow points LEFT toward the element
         } else if (fitsLeft()) {
           position = 'left';
           left = rect.left - tooltipWidth - gap;
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          arrowPosition = 'left';
+          arrowPosition = 'right'; // Arrow points RIGHT toward the element
         } else {
           // Fallback: place below even if it might overflow
           position = 'bottom';
           top = rect.bottom + gap;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-          arrowPosition = 'bottom';
+          arrowPosition = 'top'; // Arrow points UP toward the element
         }
       }
       
