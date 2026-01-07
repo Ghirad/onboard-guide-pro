@@ -723,6 +723,16 @@ const widgetScript = `
         .autosetup-btn-modal-secondary:hover { background: #e5e7eb; }
         .autosetup-minimized { position: fixed; top: 20px; right: 20px; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 12px 20px; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(var(--autosetup-primary-rgb),0.4); }
         .autosetup-minimized:hover { transform: scale(1.05); }
+        
+        /* Mini floating bar for tooltip mode - doesn't block page elements */
+        .autosetup-minibar { position: fixed; top: 12px; right: 12px; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 8px 14px; border-radius: 24px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 20px rgba(var(--autosetup-primary-rgb),0.35); animation: autosetup-minibar-appear 0.3s ease-out; }
+        .autosetup-minibar:hover { box-shadow: 0 6px 24px rgba(var(--autosetup-primary-rgb),0.45); }
+        @keyframes autosetup-minibar-appear { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .autosetup-minibar .step-badge { background: rgba(255,255,255,0.25); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .autosetup-minibar .step-title { font-size: 13px; font-weight: 500; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .autosetup-minibar-btn { background: rgba(255,255,255,0.2); border: none; color: white; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .autosetup-minibar-btn:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
+        .autosetup-minibar-btn svg { width: 14px; height: 14px; }
         .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid var(--autosetup-highlight, #ff9f0d); border-radius: 8px; z-index: 2147483646; transition: all 0.3s ease; }
         .autosetup-highlight-pulse { animation: autosetup-pulse 2s infinite; }
         .autosetup-highlight-glow { box-shadow: 0 0 20px rgba(255,159,13,0.6); animation: autosetup-glow 1.5s ease-in-out infinite; }
@@ -969,26 +979,16 @@ const widgetScript = `
       var self = this;
       var progress = this.getProgress();
       
-      // Build stepper HTML
-      var stepperHtml = this._buildStepperHtml();
-      
-      // Render modern compact top bar with stepper
-      this._container.innerHTML = '<div class="autosetup-topbar-compact">' +
-        '<div class="autosetup-topbar-left">' +
-          '<button class="autosetup-roadmap-btn-icon" onclick="AutoSetup.toggleRoadmap()" title="Ver todos os passos">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>' +
-          '</button>' +
-          '<div class="autosetup-current-step-info">' +
-            '<span class="step-badge">' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
-            '<span class="step-title">' + this._escapeHtml(step.title) + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="autosetup-topbar-center">' +
-          stepperHtml +
-        '</div>' +
-        '<div class="autosetup-topbar-right">' +
-          '<button class="autosetup-close-btn" onclick="AutoSetup.pause()" title="Minimizar">✕</button>' +
-        '</div>' +
+      // Use mini floating bar instead of full topbar to avoid blocking page elements
+      this._container.innerHTML = '<div class="autosetup-minibar">' +
+        '<span class="step-badge">' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
+        '<span class="step-title">' + this._escapeHtml(step.title) + '</span>' +
+        '<button class="autosetup-minibar-btn" onclick="AutoSetup.toggleRoadmap()" title="Ver todos os passos">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>' +
+        '</button>' +
+        '<button class="autosetup-minibar-btn" onclick="AutoSetup.pause()" title="Minimizar">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+        '</button>' +
       '</div>';
       
       // Render tooltip near element
