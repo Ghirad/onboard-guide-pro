@@ -22,6 +22,9 @@ export interface TourStep {
   selector: string;
   element: SelectedElement;
   config: TourStepConfig;
+  // Branch/flow fields
+  is_branch_point?: boolean;
+  default_next_step_id?: string | null;
 }
 
 export interface StepThemeOverride {

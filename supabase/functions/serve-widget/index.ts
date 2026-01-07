@@ -318,7 +318,7 @@ const widgetScript = `
       if (modal) modal.remove();
     },
 
-    completeStep: function() {
+    completeStep: function(clickedElement) {
       var step = this._steps[this._currentStepIndex];
       if (step) {
         this._removeTargetClickListener();
@@ -327,6 +327,21 @@ const widgetScript = `
         this._removeTooltip();
         this._emit('stepComplete', { step: this._currentStepIndex, stepData: step });
 
+        // Evaluate branch to determine next step
+        var nextStepId = this._evaluateBranch(step, clickedElement);
+        
+        if (nextStepId) {
+          // Go to specific branch target
+          var nextIndex = this._findStepById(nextStepId);
+          if (nextIndex >= 0) {
+            console.log('[AutoSetup] Branch evaluated - going to step index:', nextIndex);
+            this._currentStepIndex = nextIndex;
+            this._render();
+            return;
+          }
+        }
+
+        // Default linear flow
         if (this._currentStepIndex < this._steps.length - 1) {
           this._currentStepIndex++;
           
@@ -343,6 +358,68 @@ const widgetScript = `
           this._renderComplete();
         }
       }
+    },
+
+    // Find step index by ID
+    _findStepById: function(stepId) {
+      for (var i = 0; i < this._steps.length; i++) {
+        if (this._steps[i].id === stepId) {
+          return i;
+        }
+      }
+      return -1;
+    },
+
+    // Evaluate branch conditions to determine next step
+    _evaluateBranch: function(step, clickedElement) {
+      // If not a branch point, use default_next_step_id or linear flow
+      if (!step.is_branch_point || !step.branches || step.branches.length === 0) {
+        return step.default_next_step_id || null;
+      }
+      
+      console.log('[AutoSetup] Evaluating branches for step:', step.id);
+      
+      // Evaluate each branch in order
+      for (var i = 0; i < step.branches.length; i++) {
+        var branch = step.branches[i];
+        
+        if (branch.condition_type === 'click') {
+          // Check if clicked element matches the selector
+          if (clickedElement && branch.condition_value) {
+            try {
+              if (clickedElement.matches && clickedElement.matches(branch.condition_value)) {
+                console.log('[AutoSetup] Branch matched (click):', branch.condition_label);
+                return branch.next_step_id;
+              }
+              // Also check if clicked element is a child of the selector
+              var parent = clickedElement.closest && clickedElement.closest(branch.condition_value);
+              if (parent) {
+                console.log('[AutoSetup] Branch matched (parent click):', branch.condition_label);
+                return branch.next_step_id;
+              }
+            } catch (e) {
+              console.warn('[AutoSetup] Invalid selector in branch:', branch.condition_value);
+            }
+          }
+        } else if (branch.condition_type === 'selector') {
+          // Check if selector exists on page
+          if (branch.condition_value) {
+            try {
+              if (document.querySelector(branch.condition_value)) {
+                console.log('[AutoSetup] Branch matched (selector exists):', branch.condition_label);
+                return branch.next_step_id;
+              }
+            } catch (e) {
+              console.warn('[AutoSetup] Invalid selector in branch:', branch.condition_value);
+            }
+          }
+        }
+        // condition_type === 'custom' reserved for future
+      }
+      
+      // No condition matched, use default
+      console.log('[AutoSetup] No branch matched, using default');
+      return step.default_next_step_id || null;
     },
 
     skipStep: function() {
@@ -1349,8 +1426,9 @@ const widgetScript = `
         self._targetClickHandler = null;
         
         // Small delay to allow the natural click action to happen first
+        // Pass the clicked element for branch evaluation
         setTimeout(function() {
-          self.completeStep();
+          self.completeStep(e.target);
         }, 100);
       };
       

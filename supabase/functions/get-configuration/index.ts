@@ -46,12 +46,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch steps for this configuration WITH their actions
+    // Fetch steps for this configuration WITH their actions AND branches
     const { data: steps, error: stepsError } = await supabase
       .from('setup_steps')
       .select(`
         *,
-        actions:step_actions(*)
+        actions:step_actions(*),
+        branches:step_branches(*)
       `)
       .eq('configuration_id', configId)
       .order('step_order', { ascending: true });
@@ -64,10 +65,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Sort actions within each step by action_order and include theme_override
-    const stepsWithSortedActions = (steps || []).map(step => ({
+    // Sort actions and branches within each step
+    const stepsWithSortedData = (steps || []).map(step => ({
       ...step,
       actions: (step.actions || []).sort((a: any, b: any) => a.action_order - b.action_order),
+      branches: (step.branches || []).sort((a: any, b: any) => a.branch_order - b.branch_order),
       theme_override: step.theme_override || null,
     }));
 
@@ -123,7 +125,7 @@ Deno.serve(async (req) => {
         // Action type specific styles
         actionTypeStyles: config.action_type_styles || {}
       },
-      steps: stepsWithSortedActions,
+      steps: stepsWithSortedData,
       progress: savedProgress
     };
 
