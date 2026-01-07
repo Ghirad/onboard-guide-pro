@@ -598,8 +598,8 @@ const widgetScript = `
         .autosetup-tooltip-arrow { position: absolute; width: 12px; height: 12px; background: var(--autosetup-bg); transform: rotate(45deg); box-shadow: -2px -2px 4px rgba(0,0,0,0.05); }
         .autosetup-tooltip-arrow.arrow-top { bottom: -6px; left: 50%; margin-left: -6px; }
         .autosetup-tooltip-arrow.arrow-bottom { top: -6px; left: 50%; margin-left: -6px; box-shadow: 2px 2px 4px rgba(0,0,0,0.05); }
-        .autosetup-tooltip-arrow.arrow-left { right: -6px; top: 50%; margin-top: -6px; box-shadow: 2px -2px 4px rgba(0,0,0,0.05); }
-        .autosetup-tooltip-arrow.arrow-right { left: -6px; top: 50%; margin-top: -6px; box-shadow: -2px 2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-arrow.arrow-left { left: -6px; top: 50%; margin-top: -6px; box-shadow: -2px 2px 4px rgba(0,0,0,0.05); }
+        .autosetup-tooltip-arrow.arrow-right { right: -6px; top: 50%; margin-top: -6px; box-shadow: 2px -2px 4px rgba(0,0,0,0.05); }
         .autosetup-tooltip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .autosetup-tooltip-step { background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
         .autosetup-tooltip-title { font-weight: 600; font-size: 15px; flex: 1; }
