@@ -122,26 +122,65 @@ export function TopBarWidget({
       <div className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border shadow-md">
         {/* Main Bar */}
         <div className="flex items-center gap-4 px-4 py-3">
-          {/* Roadmap Button */}
+          {/* Progress Section with Roadmap Trigger */}
           <Popover open={isRoadmapOpen} onOpenChange={setIsRoadmapOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button 
                 className={cn(
-                  "gap-1.5 transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-1.5 transition-colors cursor-pointer",
+                  "hover:bg-muted/50",
                   isRoadmapOpen && "bg-muted"
                 )}
+                title="Clique para ver o roadmap completo"
               >
-                <Map className="h-4 w-4" />
-                <span className="hidden sm:inline">Roadmap</span>
+                {/* Map Icon */}
+                <Map className="h-4 w-4 text-muted-foreground" />
+
+                {/* Progress Dots */}
+                <div className="flex items-center gap-1">
+                  {displaySteps.map((step) => {
+                    const status = getStepStatus(step);
+                    return (
+                      <div
+                        key={step.id}
+                        className={cn(
+                          "h-2.5 w-2.5 rounded-full transition-all",
+                          status === "completed" && "bg-emerald-500",
+                          status === "skipped" && "bg-muted-foreground/50",
+                          status === "current" && "bg-primary ring-2 ring-primary/30 ring-offset-1",
+                          status === "pending" && "bg-muted-foreground/30"
+                        )}
+                      />
+                    );
+                  })}
+                  {hasLockedSteps && (
+                    <div className="flex items-center gap-0.5 ml-1 text-muted-foreground">
+                      <Lock className="h-2.5 w-2.5" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress Bar */}
+                <div className="flex items-center gap-2 w-32">
+                  <Progress value={progress} className="h-1.5 flex-1" />
+                  <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    {completedSteps.size + skippedSteps.size}/{displaySteps.length}
+                  </span>
+                </div>
+
+                {/* Chevron */}
                 <ChevronDown className={cn(
-                  "h-3 w-3 transition-transform",
+                  "h-3.5 w-3.5 text-muted-foreground transition-transform",
                   isRoadmapOpen && "rotate-180"
                 )} />
-              </Button>
+              </button>
             </PopoverTrigger>
-            <PopoverContent className="w-[420px] p-0" align="start">
+            <PopoverContent 
+              className="w-[420px] p-0" 
+              align="center"
+              sideOffset={8}
+              collisionPadding={16}
+            >
               <ProgressRoadmap
                 steps={steps}
                 visibleSteps={visibleSteps}
@@ -160,36 +199,6 @@ export function TopBarWidget({
               />
             </PopoverContent>
           </Popover>
-
-          {/* Progress Dots - show visible steps + locked indicator */}
-          <div className="flex items-center gap-1">
-            {displaySteps.map((step, index) => {
-              const status = getStepStatus(step);
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => {
-                    const originalIndex = steps.findIndex(s => s.id === step.id);
-                    if (originalIndex >= 0) onStepChange(originalIndex);
-                  }}
-                  className={cn(
-                    "h-3 w-3 rounded-full transition-all hover:scale-125",
-                    status === "completed" && "bg-emerald-500",
-                    status === "skipped" && "bg-muted-foreground/50",
-                    status === "current" && "bg-primary ring-2 ring-primary/30 ring-offset-1",
-                    status === "pending" && "bg-muted-foreground/30"
-                  )}
-                  title={`${step.title} - ${status === "completed" ? "Concluído" : status === "skipped" ? "Pulado" : status === "current" ? "Atual" : "Pendente"}`}
-                />
-              );
-            })}
-            {hasLockedSteps && (
-              <div className="flex items-center gap-0.5 ml-1 text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                <span className="text-[10px]">+?</span>
-              </div>
-            )}
-          </div>
 
           {/* Divider */}
           <div className="h-6 w-px bg-border" />
@@ -295,24 +304,6 @@ export function TopBarWidget({
             </PopoverContent>
           </Popover>
 
-          {/* Progress */}
-          <div className="flex items-center gap-3 w-48">
-            <div className="relative flex-1">
-              <Progress value={progress} className="h-2" />
-              {hasLockedSteps && (
-                <div className="absolute -right-1 top-1/2 -translate-y-1/2 flex items-center">
-                  <Lock className="h-3 w-3 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap flex items-center gap-1">
-              {completedSteps.size + skippedSteps.size}/{displaySteps.length}
-              {hasLockedSteps && <span className="text-muted-foreground/70">+?</span>}
-            </span>
-          </div>
-
-          {/* Divider */}
-          <div className="h-6 w-px bg-border" />
 
           {/* Navigation Controls */}
           <div className="flex items-center gap-1">
