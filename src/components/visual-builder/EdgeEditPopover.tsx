@@ -215,14 +215,14 @@ export function EdgeEditPopover({
               onClick={handleDelete}
             >
               <Trash2 className="h-4 w-4" />
-              {edgeType !== 'branch' && <span className="ml-1">Remover</span>}
+              <span className="ml-1">{edgeType === 'branch' ? 'Excluir' : 'Desconectar'}</span>
             </Button>
           </div>
 
           {/* Help text */}
           {edgeType === 'linear' && (
             <p className="text-xs text-muted-foreground">
-              Conexão linear automática. Remova para criar ramificações ou definir próximo passo manual.
+              Clique em "Desconectar" para deixar o passo solto e conectá-lo manualmente a outro fluxo.
             </p>
           )}
         </div>
