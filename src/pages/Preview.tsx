@@ -43,9 +43,9 @@ export default function Preview() {
         if (!grouped[action.step_id]) {
           grouped[action.step_id] = [];
         }
-        grouped[action.step_id].push(action);
+        grouped[action.step_id].push(action as StepAction);
       });
-      
+
       return grouped;
     },
     enabled: steps.length > 0

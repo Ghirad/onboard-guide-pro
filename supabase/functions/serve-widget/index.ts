@@ -979,8 +979,11 @@ const widgetScript = `
       var self = this;
       var progress = this.getProgress();
       
+      // Calculate minibar position based on element collision
+      var minibarPosition = this._calculateMinibarPosition(step.target_selector);
+      
       // Use mini floating bar instead of full topbar to avoid blocking page elements
-      this._container.innerHTML = '<div class="autosetup-minibar">' +
+      this._container.innerHTML = '<div class="autosetup-minibar" style="' + minibarPosition + '">' +
         '<span class="step-badge">' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
         '<span class="step-title">' + this._escapeHtml(step.title) + '</span>' +
         '<button class="autosetup-minibar-btn" onclick="AutoSetup.toggleRoadmap()" title="Ver todos os passos">' +
@@ -1018,6 +1021,52 @@ const widgetScript = `
         setTimeout(function() { self._executeStepActions(step); }, 500);
       }
     },
+
+    // Collision detection for minibar positioning
+    _calculateMinibarPosition: function(targetSelector) {
+      if (!targetSelector) return 'top:12px;right:12px;';
+      
+      var el = document.querySelector(targetSelector);
+      if (!el) return 'top:12px;right:12px;';
+      
+      var elementRect = el.getBoundingClientRect();
+      var minibarWidth = 280;
+      var minibarHeight = 44;
+      var margin = 20;
+      var padding = 12;
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      
+      // Define possible positions for the minibar
+      var positions = [
+        { name: 'top-right', style: 'top:' + padding + 'px;right:' + padding + 'px;', rect: { top: padding, left: vw - padding - minibarWidth, right: vw - padding, bottom: padding + minibarHeight } },
+        { name: 'top-left', style: 'top:' + padding + 'px;left:' + padding + 'px;', rect: { top: padding, left: padding, right: padding + minibarWidth, bottom: padding + minibarHeight } },
+        { name: 'bottom-right', style: 'bottom:' + padding + 'px;right:' + padding + 'px;top:auto;', rect: { top: vh - padding - minibarHeight, left: vw - padding - minibarWidth, right: vw - padding, bottom: vh - padding } },
+        { name: 'bottom-left', style: 'bottom:' + padding + 'px;left:' + padding + 'px;top:auto;', rect: { top: vh - padding - minibarHeight, left: padding, right: padding + minibarWidth, bottom: vh - padding } }
+      ];
+      
+      // Check each position for collision
+      for (var i = 0; i < positions.length; i++) {
+        var pos = positions[i];
+        if (!this._rectsOverlap(pos.rect, elementRect, margin)) {
+          return pos.style;
+        }
+      }
+      
+      // All positions collide, hide minibar
+      return 'display:none;';
+    },
+
+    _rectsOverlap: function(rect1, rect2, margin) {
+      margin = margin || 0;
+      return !(
+        rect1.right + margin < rect2.left ||
+        rect1.left - margin > rect2.right ||
+        rect1.bottom + margin < rect2.top ||
+        rect1.top - margin > rect2.bottom
+      );
+    },
+
 
     _renderTooltip: function(step) {
       var el = document.querySelector(step.target_selector);
@@ -1570,6 +1619,10 @@ const widgetScript = `
           this._showActionIndicator('Abrindo...');
           await this._openModal(action.selector);
           break;
+        case 'redirect':
+          this._showActionIndicator('Redirecionando...');
+          await this._redirectPage(action);
+          break;
       }
     },
 
@@ -1662,6 +1715,54 @@ const widgetScript = `
         }
       });
     },
+
+    _redirectPage: function(action) {
+      var self = this;
+      return new Promise(function(resolve) {
+        var url = action.redirect_url;
+        if (!url) { resolve(); return; }
+        
+        var delay = action.redirect_delay_ms || 0;
+        
+        setTimeout(function() {
+          // Save progress before redirect
+          self._saveProgress();
+          
+          // Check if internal route or external URL
+          var isInternal = url.startsWith('/') || url.startsWith(window.location.origin);
+          
+          if (isInternal) {
+            // Internal route - use history API for SPAs
+            if (action.redirect_type === 'replace') {
+              window.history.replaceState({}, '', url);
+            } else {
+              window.history.pushState({}, '', url);
+            }
+            // Trigger popstate for SPA routers
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            
+            if (action.redirect_wait_for_load !== false) {
+              // Wait for SPA to update
+              setTimeout(function() {
+                self._render();
+                resolve();
+              }, 500);
+            } else {
+              resolve();
+            }
+          } else {
+            // External URL - full navigation
+            if (action.redirect_type === 'replace') {
+              window.location.replace(url);
+            } else {
+              window.location.href = url;
+            }
+            // Don't resolve - page will reload
+          }
+        }, delay);
+      });
+    },
+
 
     _highlightElement: function(selector, animation, color) {
       this._removeHighlight();

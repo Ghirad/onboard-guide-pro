@@ -195,6 +195,10 @@ export type Database = {
           highlight_duration_ms: number | null
           id: string
           input_type: string | null
+          redirect_delay_ms: number | null
+          redirect_type: string | null
+          redirect_url: string | null
+          redirect_wait_for_load: boolean | null
           scroll_behavior: string | null
           scroll_position: string | null
           scroll_to_element: boolean | null
@@ -216,6 +220,10 @@ export type Database = {
           highlight_duration_ms?: number | null
           id?: string
           input_type?: string | null
+          redirect_delay_ms?: number | null
+          redirect_type?: string | null
+          redirect_url?: string | null
+          redirect_wait_for_load?: boolean | null
           scroll_behavior?: string | null
           scroll_position?: string | null
           scroll_to_element?: boolean | null
@@ -237,6 +245,10 @@ export type Database = {
           highlight_duration_ms?: number | null
           id?: string
           input_type?: string | null
+          redirect_delay_ms?: number | null
+          redirect_type?: string | null
+          redirect_url?: string | null
+          redirect_wait_for_load?: boolean | null
           scroll_behavior?: string | null
           scroll_position?: string | null
           scroll_to_element?: boolean | null
@@ -348,6 +360,7 @@ export type Database = {
         | "wait"
         | "highlight"
         | "open_modal"
+        | "redirect"
       app_role: "admin" | "user"
       highlight_animation: "pulse" | "glow" | "border"
       step_target_type: "page" | "modal"
@@ -485,6 +498,7 @@ export const Constants = {
         "wait",
         "highlight",
         "open_modal",
+        "redirect",
       ],
       app_role: ["admin", "user"],
       highlight_animation: ["pulse", "glow", "border"],

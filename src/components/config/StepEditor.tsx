@@ -46,6 +46,7 @@ const actionTypeLabels: Record<ActionType, string> = {
   wait: "Aguardar",
   highlight: "Destaque",
   open_modal: "Abrir Modal",
+  redirect: "Redirecionar",
 };
 
 function SortableActionItem({
