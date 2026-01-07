@@ -434,6 +434,7 @@ export default function VisualTourBuilder() {
           step_order: newOrder,
           is_required: true,
           theme_override: stepData.config.themeOverride?.enabled ? stepData.config.themeOverride : null,
+          tooltip_position: stepData.config.position || 'auto',
         } as any,
       });
       
@@ -481,6 +482,7 @@ export default function VisualTourBuilder() {
         target_selector: updates.selector,
         target_type: updates.type === 'modal' ? 'modal' : 'page',
         theme_override: updates.config?.themeOverride?.enabled ? updates.config.themeOverride : null,
+        tooltip_position: updates.config?.position || 'auto',
       } as any);
 
       // Also update associated action if type requires it

@@ -542,15 +542,15 @@ const widgetScript = `
         .autosetup-btn-modal-secondary:hover { background: #e5e7eb; }
         .autosetup-minimized { position: fixed; top: 20px; right: 20px; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 12px 20px; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(var(--autosetup-primary-rgb),0.4); }
         .autosetup-minimized:hover { transform: scale(1.05); }
-        .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid var(--autosetup-primary); border-radius: 8px; z-index: 2147483646; transition: all 0.3s ease; }
+        .autosetup-highlight { position: fixed; pointer-events: none; border: 3px solid var(--autosetup-highlight, #ff9f0d); border-radius: 8px; z-index: 2147483646; transition: all 0.3s ease; }
         .autosetup-highlight-pulse { animation: autosetup-pulse 2s infinite; }
-        .autosetup-highlight-glow { box-shadow: 0 0 20px rgba(var(--autosetup-primary-rgb),0.6); animation: autosetup-glow 1.5s ease-in-out infinite; }
+        .autosetup-highlight-glow { box-shadow: 0 0 20px rgba(255,159,13,0.6); animation: autosetup-glow 1.5s ease-in-out infinite; }
         .autosetup-highlight-border { animation: autosetup-border 1s ease-in-out infinite; }
         .autosetup-highlight-shake { animation: autosetup-shake 0.6s ease-in-out infinite; }
         .autosetup-highlight-bounce { animation: autosetup-bounce 0.8s ease-in-out infinite; }
         .autosetup-highlight-fade { animation: autosetup-fade 2s ease-in-out infinite; }
         @keyframes autosetup-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.02); } }
-        @keyframes autosetup-glow { 0%, 100% { box-shadow: 0 0 10px rgba(var(--autosetup-primary-rgb),0.4); } 50% { box-shadow: 0 0 30px rgba(var(--autosetup-primary-rgb),0.8); } }
+        @keyframes autosetup-glow { 0%, 100% { box-shadow: 0 0 10px rgba(255,159,13,0.4); } 50% { box-shadow: 0 0 30px rgba(255,159,13,0.8); } }
         @keyframes autosetup-border { 0%, 100% { border-width: 2px; } 50% { border-width: 4px; } }
         @keyframes autosetup-shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); } 20%, 40%, 60%, 80% { transform: translateX(3px); } }
         @keyframes autosetup-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
@@ -747,9 +747,10 @@ const widgetScript = `
         
         setTimeout(function() {
           self._renderTooltip(step);
-          // Use step-specific animation if overridden
+          // Use step-specific animation and color if overridden
           var animation = stepTheme.isOverride ? stepTheme.animation : null;
-          self._highlightElement(step.target_selector, animation);
+          var color = stepTheme.isOverride ? stepTheme.primaryColor : null;
+          self._highlightElement(step.target_selector, animation, color);
           
           // Auto-advance when clicking on target element
           if (self._config.autoAdvanceOnClick) {
@@ -785,7 +786,7 @@ const widgetScript = `
       // Small delay to allow scroll to complete
       setTimeout(function() {
         var rect = el.getBoundingClientRect();
-        var position = self._calculateTooltipPosition(rect);
+        var position = self._calculateTooltipPosition(rect, step.tooltip_position);
         var isLastStep = self._currentStepIndex === self._steps.length - 1;
         var buttonText = isLastStep ? 'Finalizar' : 'Próximo';
         
@@ -855,7 +856,7 @@ const widgetScript = `
       return theme;
     },
 
-    _calculateTooltipPosition: function(rect) {
+    _calculateTooltipPosition: function(rect, preferredPosition) {
       var viewportWidth = window.innerWidth;
       var viewportHeight = window.innerHeight;
       var tooltipWidth = 320;
@@ -866,33 +867,53 @@ const widgetScript = `
       var left, top;
       var arrowPosition = 'top';
       
-      // Check space below
-      if (rect.bottom + tooltipHeight + gap < viewportHeight) {
-        position = 'bottom';
-        top = rect.bottom + gap;
-        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-        arrowPosition = 'bottom';
-      } 
-      // Check space above
-      else if (rect.top - tooltipHeight - gap > 0) {
-        position = 'top';
-        top = rect.top - tooltipHeight - gap;
-        left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
-        arrowPosition = 'top';
-      }
-      // Check space right
-      else if (rect.right + tooltipWidth + gap < viewportWidth) {
-        position = 'right';
-        left = rect.right + gap;
-        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-        arrowPosition = 'right';
-      }
-      // Default to left
-      else {
-        position = 'left';
-        left = rect.left - tooltipWidth - gap;
-        top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-        arrowPosition = 'left';
+      // Use preferred position if specified and not 'auto'
+      if (preferredPosition && preferredPosition !== 'auto') {
+        position = preferredPosition;
+        
+        if (position === 'bottom') {
+          top = rect.bottom + gap;
+          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          arrowPosition = 'bottom';
+        } else if (position === 'top') {
+          top = rect.top - tooltipHeight - gap;
+          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          arrowPosition = 'top';
+        } else if (position === 'right') {
+          left = rect.right + gap;
+          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+          arrowPosition = 'right';
+        } else if (position === 'left') {
+          left = rect.left - tooltipWidth - gap;
+          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+          arrowPosition = 'left';
+        }
+      } else {
+        // Auto-calculate position based on available space
+        if (rect.bottom + tooltipHeight + gap < viewportHeight) {
+          position = 'bottom';
+          top = rect.bottom + gap;
+          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          arrowPosition = 'bottom';
+        } 
+        else if (rect.top - tooltipHeight - gap > 0) {
+          position = 'top';
+          top = rect.top - tooltipHeight - gap;
+          left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          arrowPosition = 'top';
+        }
+        else if (rect.right + tooltipWidth + gap < viewportWidth) {
+          position = 'right';
+          left = rect.right + gap;
+          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+          arrowPosition = 'right';
+        }
+        else {
+          position = 'left';
+          left = rect.left - tooltipWidth - gap;
+          top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
+          arrowPosition = 'left';
+        }
       }
       
       // Keep within viewport
@@ -975,9 +996,14 @@ const widgetScript = `
         '</div>' +
       '</div>';
 
-      // Highlight target element if exists
+      // Highlight target element if exists (with step theme)
       if (step.target_selector) {
-        setTimeout(function() { self._highlightElement(step.target_selector); }, 100);
+        setTimeout(function() { 
+          var stepTheme = self._getStepTheme(step);
+          var animation = stepTheme.isOverride ? stepTheme.animation : null;
+          var color = stepTheme.isOverride ? stepTheme.primaryColor : null;
+          self._highlightElement(step.target_selector, animation, color); 
+        }, 100);
       }
 
       // Execute actions if configured
