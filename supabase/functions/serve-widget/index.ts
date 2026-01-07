@@ -596,7 +596,7 @@ const widgetScript = `
       
       // Render compact top bar for progress and controls
       this._container.innerHTML = '<div class="autosetup-topbar-compact">' +
-        '<div class="autosetup-progress">' +
+        '<div class="autosetup-progress" onclick="AutoSetup.toggleRoadmap()" title="Clique para ver todos os passos" style="cursor:pointer">' +
           '<div class="autosetup-progress-bar"><div class="autosetup-progress-fill" style="width:' + progress.percentage + '%"></div></div>' +
           '<span>' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
         '</div>' +
