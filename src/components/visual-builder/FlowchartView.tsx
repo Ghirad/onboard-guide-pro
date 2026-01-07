@@ -1,0 +1,312 @@
+import { useCallback, useMemo } from 'react';
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Connection,
+  addEdge,
+  MarkerType,
+  NodeProps,
+  Handle,
+  Position,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { TourStep } from '@/types/visualBuilder';
+import { StepBranch } from '@/types/database';
+import { cn } from '@/lib/utils';
+import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare } from 'lucide-react';
+
+interface FlowchartViewProps {
+  steps: TourStep[];
+  branches: Record<string, StepBranch[]>;
+  onStepClick: (step: TourStep) => void;
+  onStepPositionChange: (stepId: string, x: number, y: number) => void;
+  onConnectionCreate: (sourceId: string, targetId: string) => void;
+}
+
+// Custom node component for steps
+function StepNode({ data, selected }: NodeProps) {
+  const getTypeIcon = () => {
+    switch (data.type) {
+      case 'click': return <MousePointer className="h-3.5 w-3.5" />;
+      case 'input': return <Type className="h-3.5 w-3.5" />;
+      case 'wait': return <Clock className="h-3.5 w-3.5" />;
+      case 'highlight': return <Sparkles className="h-3.5 w-3.5" />;
+      case 'redirect': return <ArrowRight className="h-3.5 w-3.5" />;
+      case 'modal': return <MessageSquare className="h-3.5 w-3.5" />;
+      default: return <MessageSquare className="h-3.5 w-3.5" />;
+    }
+  };
+
+  const getTypeColor = () => {
+    if (data.isBranchPoint) return 'bg-amber-500/20 border-amber-500 text-amber-700';
+    switch (data.type) {
+      case 'click':
+      case 'input':
+        return 'bg-emerald-500/20 border-emerald-500 text-emerald-700';
+      case 'redirect':
+        return 'bg-purple-500/20 border-purple-500 text-purple-700';
+      case 'wait':
+      case 'highlight':
+        return 'bg-blue-500/20 border-blue-500 text-blue-700';
+      default:
+        return 'bg-primary/20 border-primary text-primary';
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        'px-4 py-3 rounded-lg border-2 min-w-[180px] max-w-[220px] cursor-pointer transition-all',
+        getTypeColor(),
+        selected && 'ring-2 ring-offset-2 ring-primary shadow-lg'
+      )}
+      onClick={() => data.onClick?.(data.step)}
+    >
+      <Handle type="target" position={Position.Top} className="!bg-muted-foreground !w-3 !h-3" />
+      
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs font-semibold opacity-60">#{data.order + 1}</span>
+        {data.isBranchPoint && <GitBranch className="h-3.5 w-3.5 text-amber-600" />}
+        {getTypeIcon()}
+      </div>
+      
+      <div className="font-medium text-sm truncate" title={data.title}>
+        {data.title}
+      </div>
+      
+      {data.description && (
+        <div className="text-xs opacity-70 truncate mt-0.5" title={data.description}>
+          {data.description}
+        </div>
+      )}
+
+      {data.branchCount > 0 && (
+        <div className="text-xs mt-1.5 flex items-center gap-1 text-amber-600">
+          <GitBranch className="h-3 w-3" />
+          {data.branchCount} ramificações
+        </div>
+      )}
+
+      <Handle type="source" position={Position.Bottom} className="!bg-muted-foreground !w-3 !h-3" />
+    </div>
+  );
+}
+
+// Start node component
+function StartNode() {
+  return (
+    <div className="px-4 py-2 rounded-full bg-emerald-500 text-white font-medium text-sm shadow-lg">
+      <Handle type="source" position={Position.Bottom} className="!bg-white !w-3 !h-3" />
+      Início
+    </div>
+  );
+}
+
+// End node component
+function EndNode() {
+  return (
+    <div className="px-4 py-2 rounded-full bg-rose-500 text-white font-medium text-sm shadow-lg">
+      <Handle type="target" position={Position.Top} className="!bg-white !w-3 !h-3" />
+      Fim
+    </div>
+  );
+}
+
+const nodeTypes = {
+  stepNode: StepNode,
+  startNode: StartNode,
+  endNode: EndNode,
+};
+
+export function FlowchartView({
+  steps,
+  branches,
+  onStepClick,
+  onStepPositionChange,
+  onConnectionCreate,
+}: FlowchartViewProps) {
+  // Convert steps to ReactFlow nodes
+  const initialNodes = useMemo(() => {
+    const nodes: Node[] = [];
+    
+    // Add start node
+    nodes.push({
+      id: 'start',
+      type: 'startNode',
+      position: { x: 250, y: 0 },
+      data: {},
+    });
+
+    // Add step nodes
+    steps.forEach((step, index) => {
+      const stepBranches = branches[step.id] || [];
+      
+      // Use saved positions or calculate default
+      const x = (step as any).position_x || 250;
+      const y = (step as any).position_y || (index + 1) * 120;
+      
+      nodes.push({
+        id: step.id,
+        type: 'stepNode',
+        position: { x, y },
+        data: {
+          step,
+          title: step.config.title,
+          description: step.config.description,
+          type: step.type,
+          order: step.order,
+          isBranchPoint: (step as any).is_branch_point || stepBranches.length > 0,
+          branchCount: stepBranches.length,
+          onClick: onStepClick,
+        },
+      });
+    });
+
+    // Add end node
+    const lastY = steps.length > 0 
+      ? Math.max(...steps.map((s, i) => (s as any).position_y || (i + 1) * 120)) + 120
+      : 120;
+    
+    nodes.push({
+      id: 'end',
+      type: 'endNode',
+      position: { x: 250, y: lastY },
+      data: {},
+    });
+
+    return nodes;
+  }, [steps, branches, onStepClick]);
+
+  // Convert steps/branches to ReactFlow edges
+  const initialEdges = useMemo(() => {
+    const edges: Edge[] = [];
+    
+    // Connect start to first step
+    if (steps.length > 0) {
+      edges.push({
+        id: 'start-to-first',
+        source: 'start',
+        target: steps[0].id,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#10b981', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
+      });
+    } else {
+      // Connect start directly to end if no steps
+      edges.push({
+        id: 'start-to-end',
+        source: 'start',
+        target: 'end',
+        type: 'smoothstep',
+        style: { stroke: '#6b7280', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
+      });
+    }
+
+    // Create edges between steps
+    steps.forEach((step, index) => {
+      const stepBranches = branches[step.id] || [];
+      const defaultNextId = (step as any).default_next_step_id;
+      
+      if (stepBranches.length > 0) {
+        // Step has branches - create edge for each branch
+        stepBranches.forEach((branch, branchIndex) => {
+          if (branch.next_step_id) {
+            edges.push({
+              id: `branch-${step.id}-${branch.id}`,
+              source: step.id,
+              target: branch.next_step_id,
+              type: 'smoothstep',
+              label: branch.condition_label,
+              labelBgStyle: { fill: '#fef3c7', stroke: '#f59e0b' },
+              labelStyle: { fontSize: 10, fontWeight: 500 },
+              style: { stroke: '#f59e0b', strokeWidth: 2 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
+            });
+          }
+        });
+        
+        // Add default edge if exists
+        if (defaultNextId) {
+          edges.push({
+            id: `default-${step.id}`,
+            source: step.id,
+            target: defaultNextId,
+            type: 'smoothstep',
+            label: 'Padrão',
+            labelBgStyle: { fill: '#e5e7eb' },
+            labelStyle: { fontSize: 10 },
+            style: { stroke: '#6b7280', strokeWidth: 2, strokeDasharray: '5,5' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
+          });
+        }
+      } else {
+        // Linear flow - connect to next step or end
+        const nextStep = steps[index + 1];
+        const targetId = defaultNextId || nextStep?.id || 'end';
+        
+        edges.push({
+          id: `edge-${step.id}`,
+          source: step.id,
+          target: targetId,
+          type: 'smoothstep',
+          style: { stroke: '#6366f1', strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+        });
+      }
+    });
+
+    return edges;
+  }, [steps, branches]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Handle node drag end to save position
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (node.id !== 'start' && node.id !== 'end') {
+        onStepPositionChange(node.id, Math.round(node.position.x), Math.round(node.position.y));
+      }
+    },
+    [onStepPositionChange]
+  );
+
+  // Handle new connections
+  const onConnect = useCallback(
+    (params: Connection) => {
+      if (params.source && params.target && params.source !== 'start' && params.target !== 'end') {
+        onConnectionCreate(params.source, params.target);
+      }
+      setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds));
+    },
+    [onConnectionCreate, setEdges]
+  );
+
+  return (
+    <div className="h-full w-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeDragStop={onNodeDragStop}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        snapToGrid
+        snapGrid={[10, 10]}
+        className="bg-muted/30"
+      >
+        <Controls className="!bg-card !border !shadow-sm" />
+        <Background gap={20} size={1} color="hsl(var(--muted-foreground) / 0.1)" />
+      </ReactFlow>
+    </div>
+  );
+}

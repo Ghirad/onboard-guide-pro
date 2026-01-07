@@ -117,11 +117,15 @@ export type Database = {
         Row: {
           configuration_id: string
           created_at: string
+          default_next_step_id: string | null
           description: string | null
           id: string
           image_url: string | null
           instructions: string | null
+          is_branch_point: boolean | null
           is_required: boolean
+          position_x: number | null
+          position_y: number | null
           show_next_button: boolean
           step_order: number
           target_selector: string | null
@@ -136,11 +140,15 @@ export type Database = {
         Insert: {
           configuration_id: string
           created_at?: string
+          default_next_step_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
           instructions?: string | null
+          is_branch_point?: boolean | null
           is_required?: boolean
+          position_x?: number | null
+          position_y?: number | null
           show_next_button?: boolean
           step_order: number
           target_selector?: string | null
@@ -155,11 +163,15 @@ export type Database = {
         Update: {
           configuration_id?: string
           created_at?: string
+          default_next_step_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
           instructions?: string | null
+          is_branch_point?: boolean | null
           is_required?: boolean
+          position_x?: number | null
+          position_y?: number | null
           show_next_button?: boolean
           step_order?: number
           target_selector?: string | null
@@ -177,6 +189,13 @@ export type Database = {
             columns: ["configuration_id"]
             isOneToOne: false
             referencedRelation: "setup_configurations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_steps_default_next_step_id_fkey"
+            columns: ["default_next_step_id"]
+            isOneToOne: false
+            referencedRelation: "setup_steps"
             referencedColumns: ["id"]
           },
         ]
@@ -260,6 +279,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "step_actions_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "setup_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_branches: {
+        Row: {
+          branch_order: number | null
+          condition_label: string
+          condition_type: string
+          condition_value: string | null
+          created_at: string | null
+          id: string
+          next_step_id: string | null
+          step_id: string
+        }
+        Insert: {
+          branch_order?: number | null
+          condition_label: string
+          condition_type?: string
+          condition_value?: string | null
+          created_at?: string | null
+          id?: string
+          next_step_id?: string | null
+          step_id: string
+        }
+        Update: {
+          branch_order?: number | null
+          condition_label?: string
+          condition_type?: string
+          condition_value?: string | null
+          created_at?: string | null
+          id?: string
+          next_step_id?: string | null
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_branches_next_step_id_fkey"
+            columns: ["next_step_id"]
+            isOneToOne: false
+            referencedRelation: "setup_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_branches_step_id_fkey"
             columns: ["step_id"]
             isOneToOne: false
             referencedRelation: "setup_steps"

@@ -3,6 +3,7 @@ export type HighlightAnimation = 'pulse' | 'glow' | 'border';
 export type StepTargetType = 'page' | 'modal';
 export type ProgressStatus = 'pending' | 'completed' | 'skipped';
 export type RedirectType = 'push' | 'replace';
+export type BranchConditionType = 'click' | 'selector' | 'custom';
 
 export interface Profile {
   id: string;
@@ -44,6 +45,11 @@ export interface SetupStep {
   tips: string | null;
   created_at: string;
   updated_at: string;
+  // Branch/flow fields
+  default_next_step_id: string | null;
+  is_branch_point: boolean;
+  position_x: number;
+  position_y: number;
 }
 
 export interface StepAction {
@@ -70,6 +76,17 @@ export interface StepAction {
   redirect_wait_for_load: boolean;
 }
 
+export interface StepBranch {
+  id: string;
+  step_id: string;
+  condition_type: BranchConditionType;
+  condition_value: string | null;
+  condition_label: string;
+  next_step_id: string | null;
+  branch_order: number;
+  created_at: string;
+}
+
 export interface UserProgress {
   id: string;
   configuration_id: string;
@@ -88,4 +105,5 @@ export interface SetupConfigurationWithSteps extends SetupConfiguration {
 
 export interface SetupStepWithActions extends SetupStep {
   actions: StepAction[];
+  branches?: StepBranch[];
 }
