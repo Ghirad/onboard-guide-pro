@@ -47,12 +47,13 @@ Deno.serve(async (req) => {
     }
 
     // Fetch steps for this configuration WITH their actions AND branches
+    // Use explicit FK reference to avoid ambiguity (step_branches has 2 FKs to setup_steps)
     const { data: steps, error: stepsError } = await supabase
       .from('setup_steps')
       .select(`
         *,
         actions:step_actions(*),
-        branches:step_branches(*)
+        branches:step_branches!step_branches_step_id_fkey(*)
       `)
       .eq('configuration_id', configId)
       .order('step_order', { ascending: true });
