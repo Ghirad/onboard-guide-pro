@@ -65,11 +65,15 @@ function StepNode({ data, selected, isConnectable }: NodeProps) {
     }
   };
 
+  // Check if step has outgoing connections
+  const hasOutgoingConnection = data.defaultNextId || data.branchCount > 0;
+
   return (
     <div
       className={cn(
         'px-4 py-3 rounded-lg border-2 min-w-[180px] max-w-[220px] cursor-pointer transition-all',
         getTypeColor(),
+        !hasOutgoingConnection && 'border-dashed opacity-80',
         selected && 'ring-2 ring-offset-2 ring-primary shadow-lg'
       )}
       onClick={() => data.onClick?.(data.step)}
@@ -246,6 +250,8 @@ export function FlowchartView({
       const x = (step as any).position_x || 250;
       const y = (step as any).position_y || (index + 1) * 120;
       
+      const defaultNextId = (step as any).default_next_step_id;
+      
       nodes.push({
         id: step.id,
         type: 'stepNode',
@@ -258,6 +264,7 @@ export function FlowchartView({
           order: step.order,
           isBranchPoint: (step as any).is_branch_point || stepBranches.length > 0,
           branchCount: stepBranches.length,
+          defaultNextId: defaultNextId,
           onClick: onStepClick,
         },
       });
@@ -345,19 +352,20 @@ export function FlowchartView({
           });
         }
       } else {
-        // Linear flow - connect to next step or end
-        const nextStep = steps[index + 1];
-        const targetId = defaultNextId || nextStep?.id || 'end';
-        
-        edges.push({
-          id: `edge-${step.id}`,
-          source: step.id,
-          target: targetId,
-          type: 'smoothstep',
-          style: { stroke: '#6366f1', strokeWidth: 2, cursor: 'pointer' },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-          data: { edgeType: 'linear', stepId: step.id },
-        });
+        // Only create edge if step has explicit default_next_step_id
+        // If null/undefined, step remains "floating" without automatic connection
+        if (defaultNextId) {
+          edges.push({
+            id: `edge-${step.id}`,
+            source: step.id,
+            target: defaultNextId,
+            type: 'smoothstep',
+            style: { stroke: '#6366f1', strokeWidth: 2, cursor: 'pointer' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+            data: { edgeType: 'linear', stepId: step.id },
+          });
+        }
+        // If no defaultNextId, step is "floating" - no automatic edge created
       }
     });
 
