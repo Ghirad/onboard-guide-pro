@@ -41,6 +41,7 @@ export interface TourStepConfig {
   buttonText?: string;
   skipButtonText?: string;
   showSkip?: boolean;
+  showNextButton?: boolean;
   highlightAnimation?: 'pulse' | 'glow' | 'border';
   highlightColor?: string;
   waitForClick?: boolean;
