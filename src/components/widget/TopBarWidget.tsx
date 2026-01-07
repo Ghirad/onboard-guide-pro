@@ -14,9 +14,11 @@ import {
   ChevronDown,
   Minimize2,
   Map,
-  RotateCcw
+  RotateCcw,
+  Lock
 } from "lucide-react";
 import { SetupStep, StepAction } from "@/types/database";
+import { VisibleStep } from "@/hooks/useVisibleSteps";
 import { cn } from "@/lib/utils";
 import { ProgressRoadmap } from "./ProgressRoadmap";
 import { StepPreviewModal } from "./StepPreviewModal";
@@ -24,6 +26,8 @@ import { StepPreviewModal } from "./StepPreviewModal";
 interface TopBarWidgetProps {
   configName: string;
   steps: SetupStep[];
+  visibleSteps?: VisibleStep[];
+  hasLockedSteps?: boolean;
   currentStepIndex: number;
   completedSteps: Set<string>;
   skippedSteps: Set<string>;
@@ -40,6 +44,8 @@ interface TopBarWidgetProps {
 export function TopBarWidget({
   configName,
   steps,
+  visibleSteps,
+  hasLockedSteps = false,
   currentStepIndex,
   completedSteps,
   skippedSteps,
@@ -59,8 +65,9 @@ export function TopBarWidget({
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
 
   const currentStep = steps[currentStepIndex];
-  const progress = steps.length > 0 
-    ? Math.round(((completedSteps.size + skippedSteps.size) / steps.length) * 100) 
+  const displaySteps = visibleSteps || steps;
+  const progress = displaySteps.length > 0 
+    ? Math.round(((completedSteps.size + skippedSteps.size) / displaySteps.length) * 100) 
     : 0;
 
   const getStepStatus = (step: SetupStep) => {
@@ -137,6 +144,8 @@ export function TopBarWidget({
             <PopoverContent className="w-[420px] p-0" align="start">
               <ProgressRoadmap
                 steps={steps}
+                visibleSteps={visibleSteps}
+                hasLockedSteps={hasLockedSteps}
                 currentStepIndex={currentStepIndex}
                 completedSteps={completedSteps}
                 skippedSteps={skippedSteps}
@@ -152,14 +161,17 @@ export function TopBarWidget({
             </PopoverContent>
           </Popover>
 
-          {/* Progress Dots */}
+          {/* Progress Dots - show visible steps + locked indicator */}
           <div className="flex items-center gap-1">
-            {steps.map((step, index) => {
+            {displaySteps.map((step, index) => {
               const status = getStepStatus(step);
               return (
                 <button
                   key={step.id}
-                  onClick={() => onStepChange(index)}
+                  onClick={() => {
+                    const originalIndex = steps.findIndex(s => s.id === step.id);
+                    if (originalIndex >= 0) onStepChange(originalIndex);
+                  }}
                   className={cn(
                     "h-3 w-3 rounded-full transition-all hover:scale-125",
                     status === "completed" && "bg-emerald-500",
@@ -171,6 +183,12 @@ export function TopBarWidget({
                 />
               );
             })}
+            {hasLockedSteps && (
+              <div className="flex items-center gap-0.5 ml-1 text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                <span className="text-[10px]">+?</span>
+              </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -279,9 +297,17 @@ export function TopBarWidget({
 
           {/* Progress */}
           <div className="flex items-center gap-3 w-48">
-            <Progress value={progress} className="h-2 flex-1" />
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-              {completedSteps.size + skippedSteps.size}/{steps.length}
+            <div className="relative flex-1">
+              <Progress value={progress} className="h-2" />
+              {hasLockedSteps && (
+                <div className="absolute -right-1 top-1/2 -translate-y-1/2 flex items-center">
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap flex items-center gap-1">
+              {completedSteps.size + skippedSteps.size}/{displaySteps.length}
+              {hasLockedSteps && <span className="text-muted-foreground/70">+?</span>}
             </span>
           </div>
 

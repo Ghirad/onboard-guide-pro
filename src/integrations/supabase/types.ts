@@ -334,6 +334,55 @@ export type Database = {
           },
         ]
       }
+      user_branch_choices: {
+        Row: {
+          branch_id: string
+          client_id: string
+          configuration_id: string
+          created_at: string | null
+          id: string
+          step_id: string
+        }
+        Insert: {
+          branch_id: string
+          client_id: string
+          configuration_id: string
+          created_at?: string | null
+          id?: string
+          step_id: string
+        }
+        Update: {
+          branch_id?: string
+          client_id?: string
+          configuration_id?: string
+          created_at?: string | null
+          id?: string
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_branch_choices_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "step_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_branch_choices_configuration_id_fkey"
+            columns: ["configuration_id"]
+            isOneToOne: false
+            referencedRelation: "setup_configurations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_branch_choices_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "setup_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_progress: {
         Row: {
           client_id: string
