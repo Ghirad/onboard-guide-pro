@@ -261,3 +261,29 @@
 .animate-highlight-fade {
   animation: highlight-fade 2s ease-in-out infinite;
 }
+
+/* ReactFlow MiniMap custom styles */
+.react-flow__minimap {
+  background: hsl(var(--card) / 0.95) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: hsl(var(--muted) / 0.5) !important;
+}
+
+/* Connection line with icons animation */
+@keyframes connection-pulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.connection-icon-container {
+  animation: connection-pulse 1s ease-in-out infinite;
+}

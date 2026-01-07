@@ -4,6 +4,7 @@ import ReactFlow, {
   Edge,
   Controls,
   Background,
+  MiniMap,
   useNodesState,
   useEdgesState,
   Connection,
@@ -12,13 +13,15 @@ import ReactFlow, {
   NodeProps,
   Handle,
   Position,
+  ConnectionLineComponentProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { TourStep } from '@/types/visualBuilder';
 import { StepBranch } from '@/types/database';
 import { cn } from '@/lib/utils';
-import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare } from 'lucide-react';
+import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare, Link2 } from 'lucide-react';
 import { EdgeEditPopover } from './EdgeEditPopover';
+import { ConnectionTypeDialog } from './ConnectionTypeDialog';
 
 interface FlowchartViewProps {
   steps: TourStep[];
@@ -136,6 +139,59 @@ interface SelectedEdge {
   position: { x: number; y: number };
 }
 
+interface PendingConnection {
+  source: string;
+  target: string;
+  sourceTitle?: string;
+  targetTitle?: string;
+}
+
+// Custom connection line with visual icons
+function CustomConnectionLine({ fromX, fromY, toX, toY }: ConnectionLineComponentProps) {
+  const midX = (fromX + toX) / 2;
+  const midY = (fromY + toY) / 2;
+
+  return (
+    <g>
+      {/* Animated connection path */}
+      <path
+        fill="none"
+        stroke="url(#connection-gradient)"
+        strokeWidth={2.5}
+        strokeDasharray="8,4"
+        d={`M${fromX},${fromY} C ${fromX} ${midY} ${toX} ${midY} ${toX},${toY}`}
+        className="animate-pulse"
+      />
+      
+      {/* Gradient definition */}
+      <defs>
+        <linearGradient id="connection-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="100%" stopColor="#f59e0b" />
+        </linearGradient>
+      </defs>
+      
+      {/* Icon indicators at the end point */}
+      <foreignObject 
+        x={toX - 44} 
+        y={toY - 16} 
+        width={88} 
+        height={32}
+        className="overflow-visible"
+      >
+        <div className="connection-icon-container flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-500 text-white shadow-md border-2 border-white">
+            <Link2 className="h-3.5 w-3.5" />
+          </div>
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-white shadow-md border-2 border-white">
+            <GitBranch className="h-3.5 w-3.5" />
+          </div>
+        </div>
+      </foreignObject>
+    </g>
+  );
+}
+
 export function FlowchartView({
   steps,
   branches,
@@ -148,6 +204,27 @@ export function FlowchartView({
   onClearDefaultNext,
 }: FlowchartViewProps) {
   const [selectedEdge, setSelectedEdge] = useState<SelectedEdge | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
+
+  // MiniMap node color function
+  const nodeColor = useCallback((node: Node) => {
+    if (node.type === 'startNode') return '#10b981'; // emerald
+    if (node.type === 'endNode') return '#ef4444';   // rose
+    if (node.data?.isBranchPoint) return '#f59e0b';  // amber
+    
+    switch (node.data?.type) {
+      case 'click':
+      case 'input':
+        return '#10b981';
+      case 'redirect':
+        return '#8b5cf6';
+      case 'wait':
+      case 'highlight':
+        return '#3b82f6';
+      default:
+        return '#6366f1';
+    }
+  }, []);
 
   // Convert steps to ReactFlow nodes
   const initialNodes = useMemo(() => {
@@ -309,25 +386,39 @@ export function FlowchartView({
     [onStepPositionChange]
   );
 
-  // Handle new connections
+  // Handle new connections - show dialog to choose type
   const onConnect = useCallback(
     (params: Connection) => {
       if (params.source && params.target && params.source !== 'start' && params.target !== 'end') {
-        const sourceBranches = branches[params.source] || [];
         const sourceStep = steps.find(s => s.id === params.source);
+        const targetStep = steps.find(s => s.id === params.target);
         
-        // If step already has branches or is a branch point, create a new branch
-        if ((sourceBranches.length > 0 || (sourceStep as any)?.is_branch_point) && onBranchCreate) {
-          onBranchCreate(params.source, params.target);
-        } else {
-          // Otherwise set as default_next_step_id
-          onConnectionCreate(params.source, params.target);
-        }
+        // Show dialog to choose connection type
+        setPendingConnection({
+          source: params.source,
+          target: params.target,
+          sourceTitle: sourceStep?.config.title,
+          targetTitle: targetStep?.config.title,
+        });
       }
-      setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds));
     },
-    [onConnectionCreate, onBranchCreate, setEdges, branches, steps]
+    [steps]
   );
+
+  // Handle connection type selection
+  const handleSelectDefaultConnection = useCallback(() => {
+    if (pendingConnection) {
+      onConnectionCreate(pendingConnection.source, pendingConnection.target);
+      setPendingConnection(null);
+    }
+  }, [pendingConnection, onConnectionCreate]);
+
+  const handleSelectBranchConnection = useCallback(() => {
+    if (pendingConnection && onBranchCreate) {
+      onBranchCreate(pendingConnection.source, pendingConnection.target);
+      setPendingConnection(null);
+    }
+  }, [pendingConnection, onBranchCreate]);
 
   // Handle edge click
   const onEdgeClick = useCallback(
@@ -404,6 +495,7 @@ export function FlowchartView({
         onConnect={onConnect}
         onEdgeClick={onEdgeClick}
         nodeTypes={nodeTypes}
+        connectionLineComponent={CustomConnectionLine}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         snapToGrid
@@ -412,7 +504,24 @@ export function FlowchartView({
       >
         <Controls className="!bg-card !border !shadow-sm" />
         <Background gap={20} size={1} color="hsl(var(--muted-foreground) / 0.1)" />
+        <MiniMap 
+          nodeColor={nodeColor}
+          nodeStrokeWidth={3}
+          zoomable
+          pannable
+          className="!rounded-lg"
+        />
       </ReactFlow>
+
+      {/* Connection Type Dialog */}
+      <ConnectionTypeDialog
+        open={!!pendingConnection}
+        onOpenChange={(open) => !open && setPendingConnection(null)}
+        onSelectDefault={handleSelectDefaultConnection}
+        onSelectBranch={handleSelectBranchConnection}
+        sourceTitle={pendingConnection?.sourceTitle}
+        targetTitle={pendingConnection?.targetTitle}
+      />
 
       {/* Edge Edit Popover */}
       {selectedEdge && (
