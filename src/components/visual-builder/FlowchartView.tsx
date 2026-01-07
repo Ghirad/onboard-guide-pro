@@ -19,9 +19,10 @@ import 'reactflow/dist/style.css';
 import { TourStep } from '@/types/visualBuilder';
 import { StepBranch } from '@/types/database';
 import { cn } from '@/lib/utils';
-import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare, Link2 } from 'lucide-react';
+import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare, Link2, Maximize2, Minimize2 } from 'lucide-react';
 import { EdgeEditPopover } from './EdgeEditPopover';
 import { ConnectionTypeDialog } from './ConnectionTypeDialog';
+import { Button } from '@/components/ui/button';
 
 interface FlowchartViewProps {
   steps: TourStep[];
@@ -209,6 +210,7 @@ export function FlowchartView({
 }: FlowchartViewProps) {
   const [selectedEdge, setSelectedEdge] = useState<SelectedEdge | null>(null);
   const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // MiniMap node color function
   const nodeColor = useCallback((node: Node) => {
@@ -520,7 +522,34 @@ export function FlowchartView({
   );
 
   return (
-    <div className="h-full w-full relative">
+    <div 
+      className={cn(
+        "relative transition-all duration-300",
+        isExpanded 
+          ? "fixed inset-0 z-50 bg-background" 
+          : "h-full w-full"
+      )}
+    >
+      {/* Expand/Collapse Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="absolute top-3 right-3 z-10 bg-card shadow-md gap-2"
+      >
+        {isExpanded ? (
+          <>
+            <Minimize2 className="h-4 w-4" />
+            Reduzir
+          </>
+        ) : (
+          <>
+            <Maximize2 className="h-4 w-4" />
+            Expandir
+          </>
+        )}
+      </Button>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -576,8 +605,11 @@ export function FlowchartView({
         />
       )}
 
-      {/* Help hint */}
-      <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur px-3 py-2 rounded-lg border shadow-sm text-xs text-muted-foreground">
+      {/* Help hint - position changes based on expanded state */}
+      <div className={cn(
+        "absolute bg-card/90 backdrop-blur px-3 py-2 rounded-lg border shadow-sm text-xs text-muted-foreground",
+        isExpanded ? "bottom-6 left-6" : "bottom-4 left-4"
+      )}>
         <span className="font-medium">Dica:</span> Arraste entre nós para criar conexões • Clique em uma conexão para editar
       </div>
     </div>
