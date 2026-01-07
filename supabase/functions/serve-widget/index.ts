@@ -1001,7 +1001,6 @@ const widgetScript = `
             position = 'top';
           }
         }
-      }
       } else {
         // Auto mode: choose best position based on available space
         if (fitsBottom()) {
