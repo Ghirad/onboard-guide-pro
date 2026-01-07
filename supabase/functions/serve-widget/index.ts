@@ -261,7 +261,7 @@ const widgetScript = `
       var pendingListHtml = '<div class="autosetup-navigation-pending-list">';
       for (var i = 0; i < pendingSteps.length; i++) {
         var ps = pendingSteps[i];
-        pendingListHtml += '<div class="autosetup-navigation-pending-item">⏳ Passo ' + (ps.index + 1) + ': ' + this._escapeHtml(ps.step.title) + '</div>';
+        pendingListHtml += '<div class="autosetup-navigation-pending-item"><span class="autosetup-navigation-pending-icon">⏳</span><span class="autosetup-navigation-pending-text">Passo ' + (ps.index + 1) + ': ' + this._escapeHtml(ps.step.title) + '</span></div>';
       }
       pendingListHtml += '</div>';
       
@@ -647,7 +647,9 @@ const widgetScript = `
         .autosetup-navigation-header strong { color: var(--autosetup-text); }
         .autosetup-navigation-body { padding: 16px 20px; }
         .autosetup-navigation-pending-list { display: flex; flex-direction: column; gap: 8px; }
-        .autosetup-navigation-pending-item { padding: 10px 12px; background: #fef3c7; border-radius: 8px; font-size: 13px; color: #92400e; display: flex; align-items: center; gap: 8px; }
+        .autosetup-navigation-pending-item { padding: 10px 12px; background: #f3f4f6; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 10px; border-left: 3px solid var(--autosetup-primary); }
+        .autosetup-navigation-pending-icon { font-size: 16px; flex-shrink: 0; }
+        .autosetup-navigation-pending-text { color: #374151; }
         .autosetup-navigation-question { padding: 0 20px 16px; font-size: 14px; font-weight: 500; color: #374151; }
         .autosetup-navigation-footer { padding: 16px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
         .autosetup-navigation-footer .autosetup-btn { font-size: 13px; }
