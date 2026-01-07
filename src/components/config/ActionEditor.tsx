@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUpdateAction } from "@/hooks/useConfigurations";
-import { StepAction, ActionType, HighlightAnimation } from "@/types/database";
+import { StepAction, ActionType, HighlightAnimation, RedirectType } from "@/types/database";
 
 interface ActionEditorProps {
   action: StepAction;
@@ -47,12 +47,22 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
     updateAction.mutate({ id: action.id, stepId, highlight_duration_ms: parseInt(value) || 2000 });
   }, [action.id, stepId, updateAction]);
 
+  const handleRedirectUrlUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, redirect_url: value });
+  }, [action.id, stepId, updateAction]);
+
+  const handleRedirectDelayUpdate = useCallback((value: string) => {
+    updateAction.mutate({ id: action.id, stepId, redirect_delay_ms: parseInt(value) || 0 });
+  }, [action.id, stepId, updateAction]);
+
   const [description, setDescription] = useDebouncedValue(action.description || "", handleDescriptionUpdate);
   const [selector, setSelector] = useDebouncedValue(action.selector || "", handleSelectorUpdate);
   const [value, setValue] = useDebouncedValue(action.value || "", handleValueUpdate);
   const [delayMs, setDelayMs] = useDebouncedValue(String(action.delay_ms || 0), handleDelayUpdate);
   const [highlightColor, setHighlightColor] = useDebouncedValue(action.highlight_color || "#ff9f0d", handleHighlightColorUpdate);
   const [highlightDuration, setHighlightDuration] = useDebouncedValue(String(action.highlight_duration_ms || 2000), handleHighlightDurationUpdate);
+  const [redirectUrl, setRedirectUrl] = useDebouncedValue(action.redirect_url || "", handleRedirectUrlUpdate);
+  const [redirectDelay, setRedirectDelay] = useDebouncedValue(String(action.redirect_delay_ms || 0), handleRedirectDelayUpdate);
 
   // Non-debounced update for selects/switches
   const handleImmediateUpdate = (field: string, fieldValue: unknown) => {
@@ -85,6 +95,7 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
               <SelectItem value="wait">Aguardar</SelectItem>
               <SelectItem value="highlight">Destaque</SelectItem>
               <SelectItem value="open_modal">Abrir Modal</SelectItem>
+              <SelectItem value="redirect">Redirecionar</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -272,6 +283,58 @@ export function ActionEditor({ action, stepId }: ActionEditorProps) {
                   <SelectItem value="border">Border</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </>
+        )}
+
+        {/* Redirect specific */}
+        {action.action_type === "redirect" && (
+          <>
+            <div className="space-y-2">
+              <Label>URL ou Rota de Destino</Label>
+              <Input
+                value={redirectUrl}
+                onChange={(e) => setRedirectUrl(e.target.value)}
+                placeholder="/dashboard ou https://site.com/pagina"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use caminho relativo (/pagina) para rotas internas ou URL completa para externas
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Redirecionamento</Label>
+              <Select
+                value={action.redirect_type || "push"}
+                onValueChange={(val) => handleImmediateUpdate("redirect_type", val as RedirectType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="push">Push (mantém histórico)</SelectItem>
+                  <SelectItem value="replace">Replace (substitui histórico)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Delay antes do redirect (ms)</Label>
+              <Input
+                type="number"
+                value={redirectDelay}
+                onChange={(e) => setRedirectDelay(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Aguardar página carregar</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pausa o onboarding até a nova página carregar
+                </p>
+              </div>
+              <Switch
+                checked={action.redirect_wait_for_load !== false}
+                onCheckedChange={(checked) => handleImmediateUpdate("redirect_wait_for_load", checked)}
+              />
             </div>
           </>
         )}

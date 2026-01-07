@@ -1,7 +1,8 @@
-export type ActionType = 'click' | 'input' | 'scroll' | 'wait' | 'highlight' | 'open_modal';
+export type ActionType = 'click' | 'input' | 'scroll' | 'wait' | 'highlight' | 'open_modal' | 'redirect';
 export type HighlightAnimation = 'pulse' | 'glow' | 'border';
 export type StepTargetType = 'page' | 'modal';
 export type ProgressStatus = 'pending' | 'completed' | 'skipped';
+export type RedirectType = 'push' | 'replace';
 
 export interface Profile {
   id: string;
@@ -63,6 +64,10 @@ export interface StepAction {
   action_order: number;
   description: string | null;
   created_at: string;
+  redirect_url: string | null;
+  redirect_type: RedirectType;
+  redirect_delay_ms: number;
+  redirect_wait_for_load: boolean;
 }
 
 export interface UserProgress {
