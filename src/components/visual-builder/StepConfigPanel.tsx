@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Type, MessageSquare, Sparkles, MousePointer, Keyboard, Clock, Lightbulb, Palette } from 'lucide-react';
+import { X, Type, MessageSquare, Sparkles, MousePointer, Keyboard, Clock, Lightbulb, Palette, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,9 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { SelectedElement, TourStep, TourStepType, TourStepConfig, TooltipPosition, StepThemeOverride } from '@/types/visualBuilder';
+import { BranchEditor } from './BranchEditor';
+import { useStepBranches, useCreateBranch, useUpdateBranch, useDeleteBranch } from '@/hooks/useBranches';
+import { StepBranch } from '@/types/database';
 
 interface StepConfigPanelProps {
   selectedElement: SelectedElement | null;
@@ -16,6 +19,11 @@ interface StepConfigPanelProps {
   onSave: (step: Omit<TourStep, 'id' | 'order'>) => void;
   onUpdate: (stepId: string, updates: Partial<TourStep>) => void;
   onClose: () => void;
+  // Props para branches
+  stepId?: string;
+  allSteps?: TourStep[];
+  configurationId?: string;
+  onUpdateStepBranchPoint?: (stepId: string, isBranchPoint: boolean, defaultNextStepId: string | null) => void;
 }
 
 const stepTypes: { type: TourStepType; label: string; icon: React.ReactNode; description: string }[] = [
@@ -50,12 +58,80 @@ function getElementTypeLabel(tagName: string): string {
   return tagName.toUpperCase();
 }
 
+// Wrapper component for BranchEditor with hooks
+function BranchEditorWrapper({
+  stepId,
+  allSteps,
+  onUpdateStepBranchPoint,
+}: {
+  stepId: string;
+  allSteps: TourStep[];
+  onUpdateStepBranchPoint?: (stepId: string, isBranchPoint: boolean, defaultNextStepId: string | null) => void;
+}) {
+  const { data: branches = [], isLoading } = useStepBranches(stepId);
+  const createBranch = useCreateBranch();
+  const updateBranch = useUpdateBranch();
+  const deleteBranch = useDeleteBranch();
+
+  // Find current step data
+  const currentStep = allSteps.find(s => s.id === stepId);
+  const isBranchPoint = (currentStep as any)?.is_branch_point ?? false;
+  const defaultNextStepId = (currentStep as any)?.default_next_step_id ?? null;
+
+  const handleCreateBranch = (branch: Omit<StepBranch, 'id' | 'created_at'>) => {
+    createBranch.mutate(branch);
+  };
+
+  const handleUpdateBranch = (id: string, updates: Partial<StepBranch>) => {
+    updateBranch.mutate({ id, stepId, ...updates });
+  };
+
+  const handleDeleteBranch = (id: string) => {
+    deleteBranch.mutate({ id, stepId });
+  };
+
+  const handleToggleBranchPoint = (enabled: boolean) => {
+    onUpdateStepBranchPoint?.(stepId, enabled, defaultNextStepId);
+  };
+
+  const handleDefaultNextStepChange = (nextStepId: string | null) => {
+    onUpdateStepBranchPoint?.(stepId, isBranchPoint, nextStepId);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return (
+    <BranchEditor
+      stepId={stepId}
+      isBranchPoint={isBranchPoint}
+      defaultNextStepId={defaultNextStepId}
+      branches={branches}
+      allSteps={allSteps}
+      onToggleBranchPoint={handleToggleBranchPoint}
+      onDefaultNextStepChange={handleDefaultNextStepChange}
+      onCreateBranch={handleCreateBranch}
+      onUpdateBranch={handleUpdateBranch}
+      onDeleteBranch={handleDeleteBranch}
+    />
+  );
+}
+
 export function StepConfigPanel({
   selectedElement,
   editingStep,
   onSave,
   onUpdate,
   onClose,
+  stepId,
+  allSteps = [],
+  configurationId,
+  onUpdateStepBranchPoint,
 }: StepConfigPanelProps) {
   const element = editingStep?.element || selectedElement;
   const suggestedType = element ? getSuggestedType(element.tagName) : 'tooltip';
@@ -193,12 +269,16 @@ export function StepConfigPanel({
 
         {/* Type-specific Configuration */}
         <Tabs defaultValue="content" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="content">Conteúdo</TabsTrigger>
             <TabsTrigger value="appearance">Aparência</TabsTrigger>
             <TabsTrigger value="theme" className="flex items-center gap-1">
               <Palette className="h-3 w-3" />
               Tema
+            </TabsTrigger>
+            <TabsTrigger value="flow" className="flex items-center gap-1">
+              <GitBranch className="h-3 w-3" />
+              Fluxo
             </TabsTrigger>
           </TabsList>
 
@@ -602,6 +682,25 @@ export function StepConfigPanel({
                     <p className="text-xs opacity-80">{config.description || 'Descrição do passo aqui...'}</p>
                   </div>
                 </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="flow" className="space-y-4 mt-4">
+            {stepId && configurationId ? (
+              <BranchEditorWrapper
+                stepId={stepId}
+                allSteps={allSteps}
+                onUpdateStepBranchPoint={onUpdateStepBranchPoint}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">
+                  {editingStep 
+                    ? 'Salve o passo primeiro para configurar ramificações'
+                    : 'Adicione o passo primeiro para configurar ramificações'}
+                </p>
               </div>
             )}
           </TabsContent>

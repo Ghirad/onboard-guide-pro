@@ -133,6 +133,9 @@ export default function VisualTourBuilder() {
             showSkip: !step.is_required,
             showNextButton: (step as any).show_next_button ?? true,
           },
+          // Branch/flow fields
+          is_branch_point: (step as any).is_branch_point ?? false,
+          default_next_step_id: (step as any).default_next_step_id ?? null,
         };
       });
       setState(prev => ({ ...prev, steps: mappedSteps }));
@@ -540,6 +543,25 @@ export default function VisualTourBuilder() {
     }
   };
 
+  // Handler for updating branch point settings
+  const handleUpdateStepBranchPoint = async (stepId: string, isBranchPoint: boolean, defaultNextStepId: string | null) => {
+    try {
+      await updateStep.mutateAsync({
+        id: stepId,
+        configurationId: id!,
+        is_branch_point: isBranchPoint,
+        default_next_step_id: defaultNextStepId,
+      });
+      refetchSteps();
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar configuração de fluxo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDeleteStep = async (stepId: string) => {
     const step = state.steps.find(s => s.id === stepId);
     if (!step) return;
@@ -833,6 +855,10 @@ export default function VisualTourBuilder() {
                   currentEditingStepId: null,
                 }));
               }}
+              stepId={state.currentEditingStepId || undefined}
+              allSteps={state.steps}
+              configurationId={id}
+              onUpdateStepBranchPoint={handleUpdateStepBranchPoint}
             />
           </aside>
         )}
