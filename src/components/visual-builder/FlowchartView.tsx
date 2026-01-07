@@ -36,7 +36,7 @@ interface FlowchartViewProps {
 }
 
 // Custom node component for steps
-function StepNode({ data, selected }: NodeProps) {
+function StepNode({ data, selected, isConnectable }: NodeProps) {
   const getTypeIcon = () => {
     switch (data.type) {
       case 'click': return <MousePointer className="h-3.5 w-3.5" />;
@@ -74,7 +74,7 @@ function StepNode({ data, selected }: NodeProps) {
       )}
       onClick={() => data.onClick?.(data.step)}
     >
-      <Handle type="target" position={Position.Top} className="!bg-muted-foreground !w-3 !h-3" />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="!bg-muted-foreground !w-3 !h-3 hover:!bg-primary hover:scale-125 transition-all" />
       
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-semibold opacity-60">#{data.order + 1}</span>
@@ -99,26 +99,26 @@ function StepNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} className="!bg-muted-foreground !w-3 !h-3" />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="!bg-muted-foreground !w-3 !h-3 hover:!bg-primary hover:scale-125 transition-all" />
     </div>
   );
 }
 
 // Start node component
-function StartNode() {
+function StartNode({ isConnectable }: NodeProps) {
   return (
     <div className="px-4 py-2 rounded-full bg-emerald-500 text-white font-medium text-sm shadow-lg">
-      <Handle type="source" position={Position.Bottom} className="!bg-white !w-3 !h-3" />
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="!bg-white !w-3 !h-3 hover:!bg-emerald-200 hover:scale-125 transition-all" />
       Início
     </div>
   );
 }
 
 // End node component
-function EndNode() {
+function EndNode({ isConnectable }: NodeProps) {
   return (
     <div className="px-4 py-2 rounded-full bg-rose-500 text-white font-medium text-sm shadow-lg">
-      <Handle type="target" position={Position.Top} className="!bg-white !w-3 !h-3" />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="!bg-white !w-3 !h-3 hover:!bg-rose-200 hover:scale-125 transition-all" />
       Fim
     </div>
   );
