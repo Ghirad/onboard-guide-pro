@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -25,6 +25,7 @@ interface FlowchartViewProps {
   onStepClick: (step: TourStep) => void;
   onStepPositionChange: (stepId: string, x: number, y: number) => void;
   onConnectionCreate: (sourceId: string, targetId: string) => void;
+  onBranchCreate?: (sourceId: string, targetId: string) => void;
 }
 
 // Custom node component for steps
@@ -128,6 +129,7 @@ export function FlowchartView({
   onStepClick,
   onStepPositionChange,
   onConnectionCreate,
+  onBranchCreate,
 }: FlowchartViewProps) {
   // Convert steps to ReactFlow nodes
   const initialNodes = useMemo(() => {
@@ -267,6 +269,15 @@ export function FlowchartView({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  // Sync nodes and edges when steps/branches change
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
+
   // Handle node drag end to save position
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -281,11 +292,20 @@ export function FlowchartView({
   const onConnect = useCallback(
     (params: Connection) => {
       if (params.source && params.target && params.source !== 'start' && params.target !== 'end') {
-        onConnectionCreate(params.source, params.target);
+        const sourceBranches = branches[params.source] || [];
+        const sourceStep = steps.find(s => s.id === params.source);
+        
+        // If step already has branches or is a branch point, create a new branch
+        if ((sourceBranches.length > 0 || (sourceStep as any)?.is_branch_point) && onBranchCreate) {
+          onBranchCreate(params.source, params.target);
+        } else {
+          // Otherwise set as default_next_step_id
+          onConnectionCreate(params.source, params.target);
+        }
       }
       setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds));
     },
-    [onConnectionCreate, setEdges]
+    [onConnectionCreate, onBranchCreate, setEdges, branches, steps]
   );
 
   return (

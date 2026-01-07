@@ -18,7 +18,7 @@ import { CodeModal } from '@/components/visual-builder/CodeModal';
 // StepPreviewModal removed - preview now happens directly in iframe
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useUpdateConfiguration, SetupStepWithActions } from '@/hooks/useConfigurations';
-import { useConfigurationBranches } from '@/hooks/useBranches';
+import { useConfigurationBranches, useCreateBranch } from '@/hooks/useBranches';
 import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -599,6 +599,49 @@ export default function VisualTourBuilder() {
     navigate(`/config/${id}`);
   };
 
+  // Branch creation from flowchart
+  const createBranch = useCreateBranch();
+  
+  const handleBranchCreate = useCallback(async (sourceId: string, targetId: string) => {
+    if (!id) return;
+    
+    try {
+      // First, ensure the source step is a branch point
+      await updateStep.mutateAsync({
+        id: sourceId,
+        configurationId: id,
+        is_branch_point: true,
+      });
+      
+      const targetStep = state.steps.find(s => s.id === targetId);
+      const sourceBranches = branchesMap[sourceId] || [];
+      
+      // Create the new branch
+      await createBranch.mutateAsync({
+        step_id: sourceId,
+        condition_type: 'click',
+        condition_value: null,
+        condition_label: `Ir para "${targetStep?.config.title || 'Passo'}"`,
+        next_step_id: targetId,
+        branch_order: sourceBranches.length,
+      });
+      
+      refetchSteps();
+      
+      toast({
+        title: 'Ramificação criada',
+        description: 'Configure a condição no painel lateral.',
+      });
+    } catch (error) {
+      console.error('[VisualTourBuilder] Error creating branch:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao criar ramificação.',
+        variant: 'destructive',
+      });
+    }
+  }, [id, state.steps, branchesMap, updateStep, createBranch, refetchSteps, toast]);
+
   // Preview mode handlers
   const handleStartPreview = useCallback((startIndex = 0) => {
     if (state.steps.length === 0) {
@@ -805,6 +848,7 @@ export default function VisualTourBuilder() {
                   onConnectionCreate={(sourceId, targetId) => {
                     updateStep.mutate({ id: sourceId, configurationId: id!, default_next_step_id: targetId });
                   }}
+                  onBranchCreate={handleBranchCreate}
                 />
               </TabsContent>
               <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto m-0">
