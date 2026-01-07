@@ -24,6 +24,9 @@ const widgetScript = `
     _isInitialized: false,
     _targetClickHandler: null,
     _navigationTarget: null,
+    _clientId: null,
+    _saveProgressDebounce: null,
+    _baseUrl: 'https://ukjpxeptefznpwduwled.supabase.co',
 
     init: function(options) {
       var self = this;
@@ -34,9 +37,13 @@ const widgetScript = `
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
         actionDelay: options.actionDelay || 300,
-        allowedRoutes: options.allowedRoutes || null, // null means "use backend config"
-        autoAdvanceOnClick: options.autoAdvanceOnClick !== false // auto-advance when clicking target element
+        allowedRoutes: options.allowedRoutes || null,
+        autoAdvanceOnClick: options.autoAdvanceOnClick !== false
       };
+
+      // Generate or load client ID for tracking
+      this._clientId = this._getOrCreateClientId();
+      console.log('[AutoSetup] Client ID:', this._clientId);
 
       this._loadProgress();
       
@@ -456,12 +463,17 @@ const widgetScript = `
 
     _fetchConfiguration: function() {
       var self = this;
-      var baseUrl = 'https://ukjpxeptefznpwduwled.supabase.co';
-      // Add cache buster to prevent stale configuration
       var cacheBuster = '_t=' + Date.now();
-      var url = baseUrl + '/functions/v1/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey) + '&' + cacheBuster;
+      var url = this._baseUrl + '/functions/v1/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey) + '&clientId=' + encodeURIComponent(this._clientId) + '&' + cacheBuster;
       
-      console.log('[AutoSetup] Fetching configuration (no-cache):', url);
+      console.log('[AutoSetup] Fetching configuration with clientId:', this._clientId);
+      
+      return fetch(url, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      })
       
       return fetch(url, {
         headers: {
@@ -475,6 +487,22 @@ const widgetScript = `
       })
       .then(function(data) {
         self._steps = data.steps || [];
+        
+        // Load progress from backend if available, otherwise use localStorage
+        if (data.progress && Object.keys(data.progress).length > 0) {
+          console.log('[AutoSetup] Loading progress from backend:', Object.keys(data.progress).length, 'entries');
+          for (var stepId in data.progress) {
+            var p = data.progress[stepId];
+            self._progress[stepId] = {
+              status: p.status,
+              completedAt: p.completed_at || undefined,
+              skippedAt: p.skipped_at || undefined
+            };
+          }
+          // Save to localStorage as backup
+          self._saveProgressLocal();
+        }
+        
         self._currentStepIndex = self._findFirstIncompleteStep();
         
         // Use backend allowed_routes if not overridden in init options
@@ -501,6 +529,71 @@ const widgetScript = `
       return 0;
     },
 
+    _buildStepperHtml: function() {
+      var html = '<div class="autosetup-stepper">';
+      var maxDotsToShow = Math.min(this._steps.length, 7);
+      var startIndex = 0;
+      var endIndex = this._steps.length;
+      
+      // If too many steps, show a window around current step
+      if (this._steps.length > maxDotsToShow) {
+        var halfWindow = Math.floor(maxDotsToShow / 2);
+        startIndex = Math.max(0, this._currentStepIndex - halfWindow);
+        endIndex = Math.min(this._steps.length, startIndex + maxDotsToShow);
+        
+        // Adjust if we're near the end
+        if (endIndex - startIndex < maxDotsToShow) {
+          startIndex = Math.max(0, endIndex - maxDotsToShow);
+        }
+      }
+      
+      for (var i = startIndex; i < endIndex; i++) {
+        var step = this._steps[i];
+        var stepProgress = this._progress[step.id];
+        var status = 'pending';
+        
+        if (stepProgress) {
+          status = stepProgress.status;
+        }
+        if (i === this._currentStepIndex && status === 'pending') {
+          status = 'current';
+        }
+        
+        // Determine icon
+        var icon = '';
+        if (status === 'completed') {
+          icon = '✓';
+        } else if (status === 'skipped') {
+          icon = '⏭';
+        } else {
+          icon = (i + 1);
+        }
+        
+        // Connector line (before dot, except first)
+        if (i > startIndex) {
+          var lineStatus = '';
+          var prevProgress = this._progress[this._steps[i - 1].id];
+          if (prevProgress && prevProgress.status === 'completed') {
+            lineStatus = 'completed';
+          } else if (prevProgress && prevProgress.status === 'skipped') {
+            lineStatus = 'skipped';
+          }
+          html += '<div class="autosetup-stepper-line ' + lineStatus + '"></div>';
+        }
+        
+        // Dot with hover preview
+        html += '<div class="autosetup-stepper-item">' +
+          '<div class="autosetup-stepper-dot ' + status + '" onclick="AutoSetup.navigateToStep(' + i + ')" title="' + this._escapeHtml(step.title) + '">' +
+            icon +
+            '<div class="autosetup-stepper-preview">' + this._escapeHtml(step.title) + '</div>' +
+          '</div>' +
+        '</div>';
+      }
+      
+      html += '</div>';
+      return html;
+    },
+
     _loadProgress: function() {
       try {
         var saved = localStorage.getItem('autosetup_progress_' + this._config.configId);
@@ -508,10 +601,81 @@ const widgetScript = `
       } catch (e) { this._progress = {}; }
     },
 
-    _saveProgress: function() {
+    _saveProgressLocal: function() {
       try {
         localStorage.setItem('autosetup_progress_' + this._config.configId, JSON.stringify(this._progress));
-      } catch (e) { console.error('[AutoSetup] Failed to save progress:', e); }
+      } catch (e) { console.error('[AutoSetup] Failed to save progress locally:', e); }
+    },
+
+    _saveProgress: function() {
+      var self = this;
+      
+      // Save to localStorage immediately
+      this._saveProgressLocal();
+      
+      // Debounce backend save
+      if (this._saveProgressDebounce) {
+        clearTimeout(this._saveProgressDebounce);
+      }
+      
+      this._saveProgressDebounce = setTimeout(function() {
+        self._saveProgressToBackend();
+      }, 500);
+    },
+
+    _saveProgressToBackend: function() {
+      var self = this;
+      
+      // Save each step's progress to backend
+      for (var stepId in this._progress) {
+        var p = this._progress[stepId];
+        
+        var payload = {
+          client_id: this._clientId,
+          configuration_id: this._config.configId,
+          step_id: stepId,
+          status: p.status,
+          api_key: this._config.apiKey
+        };
+        
+        if (p.completedAt) payload.completed_at = p.completedAt;
+        if (p.skippedAt) payload.skipped_at = p.skippedAt;
+        
+        fetch(this._baseUrl + '/functions/v1/save-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function(res) {
+          if (!res.ok) {
+            console.warn('[AutoSetup] Failed to save progress to backend');
+          }
+        }).catch(function(err) {
+          console.warn('[AutoSetup] Error saving progress to backend:', err);
+        });
+      }
+    },
+
+    _getOrCreateClientId: function() {
+      var storageKey = 'autosetup_client_id';
+      var existingId = null;
+      
+      try {
+        existingId = localStorage.getItem(storageKey);
+      } catch (e) {}
+      
+      if (existingId) return existingId;
+      
+      // Generate UUID v4
+      var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+      
+      try {
+        localStorage.setItem(storageKey, uuid);
+      } catch (e) {}
+      
+      return uuid;
     },
 
     _injectStyles: function() {
@@ -608,9 +772,47 @@ const widgetScript = `
         .autosetup-tooltip-actions { display: flex; gap: 8px; justify-content: flex-end; }
         .autosetup-tooltip-actions .autosetup-btn { padding: 8px 14px; font-size: 12px; }
         
-        /* Compact topbar for tooltip mode */
-        .autosetup-topbar-compact { position: fixed; top: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-radius: 0 0 0 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
-        .autosetup-topbar-compact .autosetup-progress-bar { width: 80px; height: 4px; }
+        /* Modern Compact Topbar with Stepper */
+        .autosetup-topbar-compact { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 0; display: flex; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .autosetup-topbar-left { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+        .autosetup-topbar-center { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px 0; }
+        .autosetup-topbar-right { display: flex; align-items: center; gap: 8px; padding: 10px 16px; }
+        
+        /* Stepper styles */
+        .autosetup-stepper { display: flex; align-items: center; gap: 0; }
+        .autosetup-stepper-item { display: flex; align-items: center; position: relative; }
+        .autosetup-stepper-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); position: relative; }
+        .autosetup-stepper-dot:hover { transform: scale(1.1); border-color: rgba(255,255,255,0.6); }
+        .autosetup-stepper-dot.completed { background: #10b981; border-color: #10b981; color: white; }
+        .autosetup-stepper-dot.skipped { background: #6b7280; border-color: #6b7280; color: white; }
+        .autosetup-stepper-dot.current { background: white; border-color: white; color: var(--autosetup-primary); box-shadow: 0 0 0 4px rgba(255,255,255,0.3); animation: autosetup-current-pulse 2s infinite; }
+        .autosetup-stepper-dot.pending { background: transparent; border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); }
+        .autosetup-stepper-line { width: 20px; height: 2px; background: rgba(255,255,255,0.2); margin: 0 2px; }
+        .autosetup-stepper-line.completed { background: #10b981; }
+        .autosetup-stepper-line.skipped { background: #6b7280; }
+        @keyframes autosetup-current-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(255,255,255,0.3); } 50% { box-shadow: 0 0 0 8px rgba(255,255,255,0.15); } }
+        
+        /* Stepper tooltip on hover */
+        .autosetup-stepper-preview { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); background: white; color: #1f2937; padding: 8px 12px; border-radius: 8px; font-size: 12px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; visibility: hidden; transition: all 0.2s; z-index: 10; }
+        .autosetup-stepper-preview::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 6px solid white; }
+        .autosetup-stepper-dot:hover .autosetup-stepper-preview { opacity: 1; visibility: visible; }
+        
+        /* Current step info */
+        .autosetup-current-step-info { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 12px; max-width: 250px; }
+        .autosetup-current-step-info .step-badge { background: white; color: var(--autosetup-primary); padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px; }
+        .autosetup-current-step-info .step-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        
+        /* Roadmap button */
+        .autosetup-roadmap-btn-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .autosetup-roadmap-btn-icon:hover { background: rgba(255,255,255,0.25); }
+        .autosetup-roadmap-btn-icon svg { width: 16px; height: 16px; }
+        
+        /* Close button */
+        .autosetup-close-btn { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; }
+        .autosetup-close-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        /* Client ID badge */
+        .autosetup-client-badge { font-size: 10px; opacity: 0.7; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
         
         /* Roadmap styles */
         .autosetup-roadmap-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483648; }
@@ -774,13 +976,26 @@ const widgetScript = `
       var self = this;
       var progress = this.getProgress();
       
-      // Render compact top bar for progress and controls
+      // Build stepper HTML
+      var stepperHtml = this._buildStepperHtml();
+      
+      // Render modern compact top bar with stepper
       this._container.innerHTML = '<div class="autosetup-topbar-compact">' +
-        '<div class="autosetup-progress" onclick="AutoSetup.toggleRoadmap()" title="Clique para ver todos os passos" style="cursor:pointer">' +
-          '<div class="autosetup-progress-bar"><div class="autosetup-progress-fill" style="width:' + progress.percentage + '%"></div></div>' +
-          '<span>' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
+        '<div class="autosetup-topbar-left">' +
+          '<button class="autosetup-roadmap-btn-icon" onclick="AutoSetup.toggleRoadmap()" title="Ver todos os passos">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>' +
+          '</button>' +
+          '<div class="autosetup-current-step-info">' +
+            '<span class="step-badge">' + (this._currentStepIndex + 1) + '/' + progress.total + '</span>' +
+            '<span class="step-title">' + this._escapeHtml(step.title) + '</span>' +
+          '</div>' +
         '</div>' +
-        '<button class="autosetup-btn autosetup-btn-secondary" style="padding:4px 8px;font-size:12px" onclick="AutoSetup.pause()">✕</button>' +
+        '<div class="autosetup-topbar-center">' +
+          stepperHtml +
+        '</div>' +
+        '<div class="autosetup-topbar-right">' +
+          '<button class="autosetup-close-btn" onclick="AutoSetup.pause()" title="Minimizar">✕</button>' +
+        '</div>' +
       '</div>';
       
       // Render tooltip near element

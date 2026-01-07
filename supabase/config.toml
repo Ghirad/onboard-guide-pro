@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.serve-widget]
 verify_jwt = false
+
+[functions.save-progress]
+verify_jwt = false

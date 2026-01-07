@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const configId = url.searchParams.get('configId');
     const apiKey = url.searchParams.get('apiKey');
+    const clientId = url.searchParams.get('clientId');
 
     if (!configId || !apiKey) {
       return new Response(
@@ -70,7 +71,36 @@ Deno.serve(async (req) => {
       theme_override: step.theme_override || null,
     }));
 
-    // Return configuration and steps
+    // Fetch saved progress if clientId is provided
+    let savedProgress: Record<string, { status: string; completed_at?: string; skipped_at?: string }> = {};
+    
+    if (clientId) {
+      console.log('[get-configuration] Fetching progress for clientId:', clientId);
+      
+      const { data: progressData, error: progressError } = await supabase
+        .from('user_progress')
+        .select('step_id, status, completed_at, skipped_at')
+        .eq('client_id', clientId)
+        .eq('configuration_id', configId);
+
+      if (progressError) {
+        console.error('[get-configuration] Progress fetch error:', progressError);
+      } else if (progressData && progressData.length > 0) {
+        console.log('[get-configuration] Found progress entries:', progressData.length);
+        
+        for (const entry of progressData) {
+          if (entry.step_id) {
+            savedProgress[entry.step_id] = {
+              status: entry.status,
+              completed_at: entry.completed_at || undefined,
+              skipped_at: entry.skipped_at || undefined,
+            };
+          }
+        }
+      }
+    }
+
+    // Return configuration, steps, and saved progress
     const response = {
       configuration: {
         id: config.id,
@@ -93,10 +123,11 @@ Deno.serve(async (req) => {
         // Action type specific styles
         actionTypeStyles: config.action_type_styles || {}
       },
-      steps: stepsWithSortedActions
+      steps: stepsWithSortedActions,
+      progress: savedProgress
     };
 
-    console.log(`[get-configuration] Returned config ${configId} with ${steps?.length || 0} steps`);
+    console.log(`[get-configuration] Returned config ${configId} with ${steps?.length || 0} steps and ${Object.keys(savedProgress).length} progress entries`);
 
     return new Response(
       JSON.stringify(response),
