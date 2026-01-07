@@ -376,8 +376,35 @@ export function FlowchartView({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Sync nodes and edges when steps/branches change
+  // Use intelligent merge to preserve local positions during drag
   useEffect(() => {
-    setNodes(initialNodes);
+    setNodes((currentNodes) => {
+      // If no current nodes, use initialNodes directly
+      if (currentNodes.length === 0) {
+        return initialNodes;
+      }
+      
+      // Create map of current positions (may have been dragged and not yet synced)
+      const currentPositions = new Map(
+        currentNodes.map(node => [node.id, node.position])
+      );
+      
+      // Merge: use data from initialNodes but preserve local positions
+      return initialNodes.map(node => {
+        const currentPosition = currentPositions.get(node.id);
+        
+        // If node exists locally, preserve its current position
+        if (currentPosition) {
+          return {
+            ...node,
+            position: currentPosition,
+          };
+        }
+        
+        // New node, use position from initialNodes
+        return node;
+      });
+    });
   }, [initialNodes, setNodes]);
 
   useEffect(() => {
