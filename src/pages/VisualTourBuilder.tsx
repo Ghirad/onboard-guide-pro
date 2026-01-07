@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IframeContainer, IframeContainerRef } from '@/components/visual-builder/IframeContainer';
 import { StepConfigPanel } from '@/components/visual-builder/StepConfigPanel';
 import { TourTimeline } from '@/components/visual-builder/TourTimeline';
+import { FlowchartView } from '@/components/visual-builder/FlowchartView';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
 import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
@@ -17,6 +18,7 @@ import { CodeModal } from '@/components/visual-builder/CodeModal';
 // StepPreviewModal removed - preview now happens directly in iframe
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useUpdateConfiguration, SetupStepWithActions } from '@/hooks/useConfigurations';
+import { useConfigurationBranches } from '@/hooks/useBranches';
 import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,6 +36,7 @@ export default function VisualTourBuilder() {
 
   const { data: configuration, isLoading: configLoading } = useConfiguration(id);
   const { data: dbStepsWithActions, isLoading: stepsLoading, refetch: refetchSteps } = useConfigurationStepsWithActions(id);
+  const { data: branchesMap = {} } = useConfigurationBranches(id);
 
   const createStep = useCreateStep();
   const updateStep = useUpdateStep();
@@ -72,7 +75,7 @@ export default function VisualTourBuilder() {
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements' | 'settings'>('elements');
+  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements' | 'settings' | 'flowchart'>('elements');
   const [showCodeModal, setShowCodeModal] = useState(false);
   
   // Capture state
@@ -726,8 +729,8 @@ export default function VisualTourBuilder() {
         {/* Sidebar */}
         {!state.isPreviewMode && (
           <aside className="w-80 border-r bg-card overflow-hidden flex flex-col min-h-0">
-            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings')} className="flex-1 min-h-0 flex flex-col">
-              <TabsList className="w-full rounded-none border-b grid grid-cols-3">
+            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings' | 'flowchart')} className="flex-1 min-h-0 flex flex-col">
+              <TabsList className="w-full rounded-none border-b grid grid-cols-4">
                 <TabsTrigger value="elements">Elementos</TabsTrigger>
                 <TabsTrigger value="steps">
                   Passos
@@ -737,6 +740,7 @@ export default function VisualTourBuilder() {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="flowchart">Fluxo</TabsTrigger>
                 <TabsTrigger value="settings">Config</TabsTrigger>
               </TabsList>
               <TabsContent value="elements" className="flex-1 min-h-0 overflow-hidden m-0">
@@ -767,6 +771,19 @@ export default function VisualTourBuilder() {
                     />
                   </SortableContext>
                 </DndContext>
+              </TabsContent>
+              <TabsContent value="flowchart" className="flex-1 min-h-0 m-0">
+                <FlowchartView
+                  steps={state.steps}
+                  branches={branchesMap}
+                  onStepClick={handleEditStep}
+                  onStepPositionChange={(stepId, x, y) => {
+                    updateStep.mutate({ id: stepId, configurationId: id!, position_x: x, position_y: y });
+                  }}
+                  onConnectionCreate={(sourceId, targetId) => {
+                    updateStep.mutate({ id: sourceId, configurationId: id!, default_next_step_id: targetId });
+                  }}
+                />
               </TabsContent>
               <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto m-0">
                 {configuration && (
