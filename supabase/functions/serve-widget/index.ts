@@ -225,6 +225,51 @@ const widgetScript = `
       }
     },
 
+    // Reset all progress and go back to first step
+    resetProgress: function() {
+      this._progress = {};
+      this._saveProgress();
+      this._currentStepIndex = 0;
+      this._closeRoadmap();
+      this._render();
+      this._emit('reset', { type: 'full' });
+    },
+
+    // Reset progress from a specific step onwards
+    resetFromStep: function(stepIndex) {
+      for (var i = stepIndex; i < this._steps.length; i++) {
+        delete this._progress[this._steps[i].id];
+      }
+      this._saveProgress();
+      this._currentStepIndex = stepIndex;
+      this._closeRoadmap();
+      this._render();
+      this._emit('reset', { type: 'partial', fromStep: stepIndex });
+    },
+
+    // Toggle roadmap visibility
+    toggleRoadmap: function() {
+      this._isRoadmapOpen = !this._isRoadmapOpen;
+      this._renderRoadmapOverlay();
+    },
+
+    _closeRoadmap: function() {
+      this._isRoadmapOpen = false;
+      var overlay = document.getElementById('autosetup-roadmap-overlay');
+      if (overlay) overlay.remove();
+    },
+
+    // Show step preview modal
+    previewStep: function(stepIndex) {
+      this._closeRoadmap();
+      this._renderStepPreviewModal(stepIndex);
+    },
+
+    _closePreviewModal: function() {
+      var modal = document.getElementById('autosetup-preview-modal');
+      if (modal) modal.remove();
+    },
+
     getProgress: function() {
       var completed = 0;
       var total = this._steps.length;
@@ -421,6 +466,56 @@ const widgetScript = `
         /* Compact topbar for tooltip mode */
         .autosetup-topbar-compact { position: fixed; top: 0; right: 0; z-index: 2147483647; background: linear-gradient(135deg, var(--autosetup-primary) 0%, var(--autosetup-secondary) 100%); color: white; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-radius: 0 0 0 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
         .autosetup-topbar-compact .autosetup-progress-bar { width: 80px; height: 4px; }
+        
+        /* Roadmap styles */
+        .autosetup-roadmap-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483648; }
+        .autosetup-roadmap { position: fixed; top: 60px; left: 20px; z-index: 2147483649; background: var(--autosetup-bg); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.25); max-width: 400px; width: calc(100% - 40px); max-height: calc(100vh - 100px); display: flex; flex-direction: column; color: var(--autosetup-text); }
+        .autosetup-roadmap-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid #e5e7eb; }
+        .autosetup-roadmap-header h3 { margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .autosetup-roadmap-body { flex: 1; overflow-y: auto; padding: 12px; }
+        .autosetup-roadmap-step { display: flex; gap: 12px; padding: 12px; border-radius: 8px; margin-bottom: 4px; position: relative; }
+        .autosetup-roadmap-step.current { background: rgba(var(--autosetup-primary-rgb), 0.1); border-left: 3px solid var(--autosetup-primary); }
+        .autosetup-roadmap-step.completed { opacity: 0.7; }
+        .autosetup-roadmap-step.pending { opacity: 0.6; }
+        .autosetup-roadmap-step.skipped { opacity: 0.5; }
+        .autosetup-roadmap-icon { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+        .autosetup-roadmap-icon.completed { background: #10b981; color: white; }
+        .autosetup-roadmap-icon.skipped { background: #9ca3af; color: white; }
+        .autosetup-roadmap-icon.current { background: var(--autosetup-primary); color: white; box-shadow: 0 0 0 3px rgba(var(--autosetup-primary-rgb), 0.3); }
+        .autosetup-roadmap-icon.pending { background: #e5e7eb; color: #6b7280; }
+        .autosetup-roadmap-content { flex: 1; min-width: 0; }
+        .autosetup-roadmap-title { font-weight: 500; font-size: 14px; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+        .autosetup-roadmap-title .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #f3f4f6; color: #6b7280; }
+        .autosetup-roadmap-desc { font-size: 12px; color: #6b7280; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .autosetup-roadmap-actions-summary { font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 4px; }
+        .autosetup-roadmap-btn { flex-shrink: 0; }
+        .autosetup-roadmap-btn button { padding: 4px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; border: 1px solid #e5e7eb; background: white; color: #374151; transition: all 0.2s; }
+        .autosetup-roadmap-btn button:hover { background: #f3f4f6; border-color: #d1d5db; }
+        .autosetup-roadmap-connector { position: absolute; left: 25px; top: 40px; width: 2px; height: calc(100% - 20px); background: #e5e7eb; }
+        .autosetup-roadmap-connector.completed { background: #10b981; }
+        .autosetup-roadmap-footer { padding: 12px 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; }
+        
+        /* Preview Modal styles */
+        .autosetup-preview-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2147483650; backdrop-filter: blur(4px); }
+        .autosetup-preview-content { background: var(--autosetup-bg); border-radius: 16px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; color: var(--autosetup-text); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+        .autosetup-preview-header { padding: 20px; border-bottom: 1px solid #e5e7eb; }
+        .autosetup-preview-header .meta { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .autosetup-preview-header h3 { margin: 0; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .autosetup-preview-header p { margin: 8px 0 0; font-size: 14px; color: #6b7280; line-height: 1.5; }
+        .autosetup-preview-body { padding: 20px; }
+        .autosetup-preview-section { margin-bottom: 16px; }
+        .autosetup-preview-section h4 { font-size: 13px; font-weight: 600; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+        .autosetup-preview-actions-list { list-style: none; padding: 0; margin: 0; }
+        .autosetup-preview-actions-list li { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+        .autosetup-preview-actions-list li:last-child { border-bottom: none; }
+        .autosetup-preview-actions-list .num { width: 20px; height: 20px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #6b7280; }
+        .autosetup-preview-prereqs { background: #f0fdf4; border-radius: 8px; padding: 12px; }
+        .autosetup-preview-prereqs.pending { background: #fef3c7; }
+        .autosetup-preview-prereq-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+        .autosetup-preview-prereq-item.completed { color: #10b981; }
+        .autosetup-preview-prereq-item.skipped { color: #9ca3af; }
+        .autosetup-preview-prereq-item.pending { color: #f59e0b; }
+        .autosetup-preview-footer { padding: 16px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end; }
       \`;
     },
 
@@ -761,6 +856,124 @@ const widgetScript = `
         '<strong>🎉 Configuração concluída!</strong> Todas as etapas foram finalizadas.' +
         '<button class="autosetup-btn autosetup-btn-secondary" style="margin-left:16px" onclick="AutoSetup.destroy()">Fechar</button>' +
       '</div>';
+    },
+
+    _renderRoadmapOverlay: function() {
+      var existing = document.getElementById('autosetup-roadmap-overlay');
+      if (existing) existing.remove();
+      
+      if (!this._isRoadmapOpen) return;
+      
+      var self = this;
+      var overlay = document.createElement('div');
+      overlay.id = 'autosetup-roadmap-overlay';
+      overlay.className = 'autosetup-roadmap-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) self._closeRoadmap(); };
+      
+      var roadmap = document.createElement('div');
+      roadmap.className = 'autosetup-roadmap';
+      
+      var completedCount = 0;
+      for (var key in this._progress) {
+        if (this._progress[key].status === 'completed') completedCount++;
+      }
+      
+      var stepsHtml = '';
+      for (var i = 0; i < this._steps.length; i++) {
+        var step = this._steps[i];
+        var stepProgress = this._progress[step.id];
+        var status = stepProgress ? stepProgress.status : 'pending';
+        if (i === this._currentStepIndex && status === 'pending') status = 'current';
+        
+        var iconContent = status === 'completed' ? '✓' : status === 'skipped' ? '⏭' : (i + 1);
+        var actionBtn = status === 'completed' || status === 'skipped' 
+          ? '<button onclick="AutoSetup.resetFromStep(' + i + ')">Refazer</button>'
+          : status === 'current' 
+            ? '<button onclick="AutoSetup._closeRoadmap()">Continuar</button>'
+            : '<button onclick="AutoSetup.previewStep(' + i + ')">Pré-ver</button>';
+        
+        var connector = i < this._steps.length - 1 
+          ? '<div class="autosetup-roadmap-connector ' + (status === 'completed' ? 'completed' : '') + '"></div>' 
+          : '';
+        
+        stepsHtml += '<div class="autosetup-roadmap-step ' + status + '">' +
+          connector +
+          '<div class="autosetup-roadmap-icon ' + status + '">' + iconContent + '</div>' +
+          '<div class="autosetup-roadmap-content">' +
+            '<div class="autosetup-roadmap-title">' + this._escapeHtml(step.title) + 
+              (!step.is_required ? '<span class="badge">Opcional</span>' : '') + 
+            '</div>' +
+            (step.description ? '<div class="autosetup-roadmap-desc">' + this._escapeHtml(step.description) + '</div>' : '') +
+          '</div>' +
+          '<div class="autosetup-roadmap-btn">' + actionBtn + '</div>' +
+        '</div>';
+      }
+      
+      roadmap.innerHTML = 
+        '<div class="autosetup-roadmap-header">' +
+          '<h3>📋 Roadmap do Onboarding</h3>' +
+          '<button class="autosetup-btn autosetup-btn-modal-secondary" style="padding:6px 12px;font-size:12px" onclick="AutoSetup.resetProgress()">↺ Reiniciar</button>' +
+        '</div>' +
+        '<div class="autosetup-roadmap-body">' + stepsHtml + '</div>' +
+        '<div class="autosetup-roadmap-footer">' + completedCount + ' de ' + this._steps.length + ' passos concluídos</div>';
+      
+      overlay.appendChild(roadmap);
+      document.body.appendChild(overlay);
+    },
+
+    _renderStepPreviewModal: function(stepIndex) {
+      var step = this._steps[stepIndex];
+      if (!step) return;
+      
+      var self = this;
+      var modal = document.createElement('div');
+      modal.id = 'autosetup-preview-modal';
+      modal.className = 'autosetup-preview-modal';
+      modal.onclick = function(e) { if (e.target === modal) self._closePreviewModal(); };
+      
+      var prereqsHtml = '';
+      if (stepIndex > 0) {
+        prereqsHtml = '<div class="autosetup-preview-section"><h4>🔗 Passos anteriores:</h4><div class="autosetup-preview-prereqs">';
+        for (var i = 0; i < stepIndex; i++) {
+          var prev = this._steps[i];
+          var prevProgress = this._progress[prev.id];
+          var prevStatus = prevProgress ? prevProgress.status : 'pending';
+          var icon = prevStatus === 'completed' ? '✓' : prevStatus === 'skipped' ? '⏭' : '⏳';
+          prereqsHtml += '<div class="autosetup-preview-prereq-item ' + prevStatus + '">' + icon + ' ' + this._escapeHtml(prev.title) + '</div>';
+        }
+        prereqsHtml += '</div></div>';
+      }
+      
+      var actionsHtml = '';
+      if (step.actions && step.actions.length > 0) {
+        actionsHtml = '<div class="autosetup-preview-section"><h4>📋 O que você vai fazer:</h4><ol class="autosetup-preview-actions-list">';
+        for (var j = 0; j < step.actions.length; j++) {
+          var action = step.actions[j];
+          var actionLabel = {click:'Clicar',input:'Preencher',scroll:'Rolar',wait:'Aguardar',highlight:'Destacar',open_modal:'Abrir'}[action.action_type] || action.action_type;
+          actionsHtml += '<li><span class="num">' + (j+1) + '</span>' + actionLabel + '</li>';
+        }
+        actionsHtml += '</ol></div>';
+      }
+      
+      modal.innerHTML = 
+        '<div class="autosetup-preview-content">' +
+          '<div class="autosetup-preview-header">' +
+            '<div class="meta">👁️ Pré-visualização: Passo ' + (stepIndex + 1) + ' de ' + this._steps.length + '</div>' +
+            '<h3>📌 ' + this._escapeHtml(step.title) + '</h3>' +
+            (step.description ? '<p>' + this._escapeHtml(step.description) + '</p>' : '') +
+          '</div>' +
+          '<div class="autosetup-preview-body">' +
+            (step.image_url ? '<img src="' + step.image_url + '" style="width:100%;border-radius:8px;margin-bottom:16px"/>' : '') +
+            actionsHtml +
+            prereqsHtml +
+          '</div>' +
+          '<div class="autosetup-preview-footer">' +
+            '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup._closePreviewModal()">Fechar</button>' +
+            '<button class="autosetup-btn autosetup-btn-modal-primary" onclick="AutoSetup.goToStep(' + stepIndex + ');AutoSetup._closePreviewModal()">Ir para este passo →</button>' +
+          '</div>' +
+        '</div>';
+      
+      document.body.appendChild(modal);
     },
 
     _executeStepActions: async function(step) {
