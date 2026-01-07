@@ -718,6 +718,8 @@ const widgetScript = `
         ? 'background:' + stepTheme.primaryColor + '; color: white;'
         : '';
       
+      var showNextBtn = step.show_next_button !== false;
+      
       this._container.innerHTML = '<div class="autosetup-modal-overlay">' +
         '<div class="autosetup-modal" style="' + modalStyle + '">' +
           (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-modal-image" alt=""/>' : '') +
@@ -726,7 +728,7 @@ const widgetScript = `
           '<div class="autosetup-modal-progress">Passo ' + (this._currentStepIndex + 1) + ' de ' + progress.total + '</div>' +
           '<div class="autosetup-modal-actions">' +
             (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
-            '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+            (showNextBtn ? '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' : '') +
           '</div>' +
         '</div>' +
       '</div>';
