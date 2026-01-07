@@ -24,10 +24,12 @@ export function CodeGenerator({ config }: CodeGeneratorProps) {
     position: '${config.widget_position}',
     autoStart: ${config.auto_start},
     
+    // Controle de inicialização (obrigatório para abrir o onboarding)
+    'tem.auto.setup': true,
+    
     // Identificação do usuário (substitua pelos dados do seu sistema)
-    userId: 'ID_UNICO_DO_USUARIO',      // ID único do usuário no seu sistema
-    userName: 'NOME_DO_USUARIO'         // Nome do usuário para personalização
-    // allowedRoutes é configurado no dashboard e buscado automaticamente
+    userId: 'ID_UNICO_DO_USUARIO',
+    userName: 'NOME_DO_USUARIO'
   });
 </script>`;
 

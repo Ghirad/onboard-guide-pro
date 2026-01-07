@@ -24,8 +24,6 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
 
   const widgetUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/serve-widget`;
 
-  const allowedRoutes = (config as any).allowed_routes || [];
-  
   const scriptCode = `<!-- Auto-Setup Widget -->
 <script src="${widgetUrl}"></script>
 <script>
@@ -35,10 +33,12 @@ export function CodeModal({ open, onOpenChange, config }: CodeModalProps) {
     position: '${config.widget_position}',
     autoStart: ${config.auto_start},
     
+    // Controle de inicialização (obrigatório para abrir o onboarding)
+    'tem.auto.setup': true,
+    
     // Identificação do usuário (substitua pelos dados do seu sistema)
-    userId: 'ID_UNICO_DO_USUARIO',      // ID único do usuário no seu sistema
-    userName: 'NOME_DO_USUARIO'         // Nome do usuário para personalização${allowedRoutes.length > 0 ? `,
-    allowedRoutes: ${JSON.stringify(allowedRoutes)}` : ''}
+    userId: 'ID_UNICO_DO_USUARIO',
+    userName: 'NOME_DO_USUARIO'
   });
 </script>`;
 
