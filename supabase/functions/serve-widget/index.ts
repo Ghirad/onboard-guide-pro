@@ -26,6 +26,7 @@ const widgetScript = `
     _navigationTarget: null,
 
     init: function(options) {
+      var self = this;
       this._config = {
         configId: options.configId,
         apiKey: options.apiKey,
@@ -39,24 +40,42 @@ const widgetScript = `
 
       this._loadProgress();
       
+      console.log('[AutoSetup] Initializing with configId:', this._config.configId);
+      
       // Fetch configuration first to get allowed_routes from backend
       this._fetchConfiguration().then(function() {
         // Now check if widget should show on current route
-        if (!this._shouldShowOnCurrentRoute()) {
+        if (!self._shouldShowOnCurrentRoute()) {
           console.log('[AutoSetup] Widget not configured for this route:', window.location.pathname);
-          console.log('[AutoSetup] Allowed routes:', this._config.allowedRoutes);
+          console.log('[AutoSetup] Allowed routes:', self._config.allowedRoutes);
           // Setup route observer to show widget when navigating to allowed route
-          this._setupRouteObserver();
+          self._setupRouteObserver();
           return;
         }
 
-        this._initializeWidget();
-      }.bind(this)).catch(function(error) {
+        // Ensure body is ready before initializing widget
+        self._ensureBodyReady(function() {
+          self._initializeWidget();
+        });
+      }).catch(function(error) {
         console.error('[AutoSetup] Failed to initialize:', error);
-        this._emit('error', { error: error });
-      }.bind(this));
+        self._emit('error', { error: error });
+      });
 
       return this;
+    },
+
+    _ensureBodyReady: function(callback) {
+      if (document.body) {
+        console.log('[AutoSetup] Body is ready, initializing immediately');
+        callback();
+      } else {
+        console.log('[AutoSetup] Waiting for DOMContentLoaded...');
+        document.addEventListener('DOMContentLoaded', function() {
+          console.log('[AutoSetup] DOMContentLoaded fired, initializing now');
+          callback();
+        }, { once: true });
+      }
     },
 
     _initializeWidget: function() {
@@ -662,10 +681,27 @@ const widgetScript = `
     },
 
     _createContainer: function() {
+      // Reuse existing container if present
+      var existing = document.getElementById('autosetup-widget');
+      if (existing) {
+        console.log('[AutoSetup] Reusing existing container');
+        this._container = existing;
+        return;
+      }
+      
+      // Ensure body exists
+      if (!document.body) {
+        console.warn('[AutoSetup] document.body not available, will retry');
+        var self = this;
+        setTimeout(function() { self._createContainer(); }, 50);
+        return;
+      }
+      
       this._container = document.createElement('div');
       this._container.className = 'autosetup-container';
       this._container.id = 'autosetup-widget';
       document.body.appendChild(this._container);
+      console.log('[AutoSetup] Container created and appended to body');
     },
 
     _render: function() {
