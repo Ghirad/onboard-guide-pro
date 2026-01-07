@@ -75,7 +75,7 @@ export default function VisualTourBuilder() {
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'steps' | 'elements' | 'settings' | 'flowchart'>('elements');
+  const [sidebarTab, setSidebarTab] = useState<'steps' | 'settings' | 'flowchart'>('steps');
   const [showCodeModal, setShowCodeModal] = useState(false);
   
   // Capture state
@@ -829,9 +829,8 @@ export default function VisualTourBuilder() {
         {/* Sidebar */}
         {!state.isPreviewMode && (
           <aside className="w-80 border-r bg-card overflow-hidden flex flex-col min-h-0">
-            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'elements' | 'settings' | 'flowchart')} className="flex-1 min-h-0 flex flex-col">
-              <TabsList className="w-full rounded-none border-b grid grid-cols-4">
-                <TabsTrigger value="elements">Elementos</TabsTrigger>
+            <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as 'steps' | 'settings' | 'flowchart')} className="flex-1 min-h-0 flex flex-col">
+              <TabsList className="w-full rounded-none border-b grid grid-cols-3">
                 <TabsTrigger value="steps">
                   Passos
                   {state.steps.length > 0 && (
@@ -843,15 +842,6 @@ export default function VisualTourBuilder() {
                 <TabsTrigger value="flowchart">Fluxo</TabsTrigger>
                 <TabsTrigger value="settings">Config</TabsTrigger>
               </TabsList>
-              <TabsContent value="elements" className="flex-1 min-h-0 overflow-hidden m-0">
-                <ElementsPanel
-                  elements={scannedElements}
-                  isLoading={isScanning}
-                  onElementClick={handleScannedElementClick}
-                  onElementHover={setHighlightSelector}
-                  onScanElements={handleScanElements}
-                />
-              </TabsContent>
               <TabsContent value="steps" className="flex-1 min-h-0 overflow-y-auto m-0">
                 <DndContext
                   sensors={sensors}
