@@ -30,6 +30,8 @@
       this._config = {
         configId: options.configId,
         apiKey: options.apiKey,
+        userId: options.userId || null,
+        userName: options.userName || null,
         position: options.position || 'top-bar',
         autoStart: options.autoStart !== false,
         autoExecuteActions: options.autoExecuteActions !== false,
@@ -191,6 +193,12 @@
     _fetchConfiguration: function() {
       var url = API_BASE + '/get-configuration?configId=' + encodeURIComponent(this._config.configId) + '&apiKey=' + encodeURIComponent(this._config.apiKey);
       
+      // Se tiver userId, envia como clientId para buscar progresso do servidor
+      if (this._config.userId) {
+        url += '&clientId=' + encodeURIComponent(this._config.userId);
+      }
+      
+      var self = this;
       return fetch(url)
         .then(function(res) {
           if (!res.ok) {
@@ -199,7 +207,32 @@
             });
           }
           return res.json();
+        })
+        .then(function(data) {
+          // Restaurar progresso do servidor se existir e tiver userId
+          if (self._config.userId && data.progress && Object.keys(data.progress).length > 0) {
+            self._restoreProgressFromServer(data.progress);
+          }
+          return data;
         });
+    },
+
+    _restoreProgressFromServer: function(progress) {
+      this._completedSteps = [];
+      this._skippedSteps = [];
+      
+      for (var stepId in progress) {
+        if (progress[stepId].status === 'completed') {
+          this._completedSteps.push(stepId);
+        } else if (progress[stepId].status === 'skipped') {
+          this._skippedSteps.push(stepId);
+        }
+      }
+      
+      console.log('[AutoSetup] Restored progress from server:', {
+        completed: this._completedSteps.length,
+        skipped: this._skippedSteps.length
+      });
     },
 
     _loadProgress: function() {
@@ -228,6 +261,46 @@
       } catch (e) {
         console.warn('[AutoSetup] Failed to save progress:', e);
       }
+      
+      // Se tiver userId, sincroniza com o servidor
+      if (this._config.userId) {
+        this._syncProgressToServer();
+      }
+    },
+
+    _syncProgressToServer: function() {
+      var self = this;
+      var currentStep = this._steps[this._currentIndex > 0 ? this._currentIndex - 1 : 0];
+      
+      if (!currentStep) return;
+      
+      var stepId = currentStep.id;
+      var isCompleted = this._completedSteps.indexOf(stepId) !== -1;
+      var isSkipped = this._skippedSteps.indexOf(stepId) !== -1;
+      
+      if (!isCompleted && !isSkipped) return;
+      
+      var status = isCompleted ? 'completed' : 'skipped';
+      
+      fetch(API_BASE + '/save-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: this._config.userId,
+          configuration_id: this._config.configId,
+          step_id: stepId,
+          status: status,
+          api_key: this._config.apiKey,
+          completed_at: isCompleted ? new Date().toISOString() : null,
+          skipped_at: isSkipped ? new Date().toISOString() : null
+        })
+      }).then(function(res) {
+        if (res.ok) {
+          console.log('[AutoSetup] Progress synced to server');
+        }
+      }).catch(function(err) {
+        console.warn('[AutoSetup] Failed to sync progress:', err);
+      });
     },
 
     _finish: function() {
@@ -354,11 +427,16 @@
         return '<div class="' + cls + '"></div>';
       }).join('');
 
+      // Saudação personalizada com nome do usuário
+      var greeting = this._config.userName 
+        ? 'Olá, ' + this._escapeHtml(this._config.userName) + '! ' 
+        : '';
+
       return '<div class="autosetup-topbar">' +
         '<div class="autosetup-topbar-content">' +
           '<div class="autosetup-progress-dots">' + dots + '</div>' +
           '<div class="autosetup-step-info">' +
-            '<div class="autosetup-step-title">Passo ' + (this._currentIndex + 1) + ': ' + this._escapeHtml(step.title) + '</div>' +
+            '<div class="autosetup-step-title">' + greeting + 'Passo ' + (this._currentIndex + 1) + ': ' + this._escapeHtml(step.title) + '</div>' +
             (step.description ? '<div class="autosetup-step-desc">' + this._escapeHtml(step.description) + '</div>' : '') +
           '</div>' +
         '</div>' +
@@ -376,6 +454,11 @@
     },
 
     _renderModal: function(step) {
+      // Saudação personalizada com nome do usuário
+      var welcomeMsg = this._config.userName 
+        ? '<p style="color: #6366f1; font-weight: 500; margin-bottom: 12px;">Olá, ' + this._escapeHtml(this._config.userName) + '!</p>'
+        : '';
+
       return '<div class="autosetup-modal-overlay">' +
         '<div class="autosetup-modal">' +
           '<div class="autosetup-modal-header">' +
@@ -386,6 +469,7 @@
             '<button class="autosetup-close" data-action="minimize">&times;</button>' +
           '</div>' +
           '<div class="autosetup-modal-body">' +
+            welcomeMsg +
             (step.image_url ? '<img class="autosetup-modal-image" src="' + this._escapeHtml(step.image_url) + '" alt="">' : '') +
             (step.description ? '<p class="autosetup-modal-desc">' + this._escapeHtml(step.description) + '</p>' : '') +
             (step.instructions ? '<p class="autosetup-modal-desc">' + this._escapeHtml(step.instructions) + '</p>' : '') +
