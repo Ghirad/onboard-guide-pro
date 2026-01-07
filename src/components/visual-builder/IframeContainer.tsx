@@ -3,7 +3,15 @@ import { Loader2, AlertCircle, RefreshCw, ExternalLink, MousePointer, Type, Eye,
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SelectedElement, TourStep } from '@/types/visualBuilder';
-import { ScannedElement } from './ElementsPanel';
+
+// ScannedElement type for internal use
+interface ScannedElement {
+  type: 'button' | 'link' | 'input' | 'checkbox' | 'radio' | 'select' | 'menu' | 'navigation' | 'other';
+  selector: string;
+  label: string;
+  tagName: string;
+  rect: { top: number; left: number; width: number; height: number };
+}
 interface IframeContainerProps {
   url: string;
   mode?: 'direct' | 'proxy';

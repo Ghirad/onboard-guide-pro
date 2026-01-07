@@ -11,7 +11,7 @@ import { TourTimeline } from '@/components/visual-builder/TourTimeline';
 import { FlowchartView } from '@/components/visual-builder/FlowchartView';
 import { BuilderToolbar } from '@/components/visual-builder/BuilderToolbar';
 import { PreviewOverlay } from '@/components/visual-builder/PreviewOverlay';
-import { ElementsPanel, ScannedElement } from '@/components/visual-builder/ElementsPanel';
+
 import { CaptureModal } from '@/components/visual-builder/CaptureModal';
 import { SettingsPanel } from '@/components/visual-builder/SettingsPanel';
 import { CodeModal } from '@/components/visual-builder/CodeModal';
@@ -73,8 +73,6 @@ export default function VisualTourBuilder() {
   const [iframeReady, setIframeReady] = useState(false);
   const [highlightSelector, setHighlightSelector] = useState<string | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
-  const [scannedElements, setScannedElements] = useState<ScannedElement[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'steps' | 'settings' | 'flowchart'>('steps');
   const [showCodeModal, setShowCodeModal] = useState(false);
   
@@ -171,33 +169,6 @@ export default function VisualTourBuilder() {
     handleCapturedElement(element);
   }, [handleCapturedElement]);
 
-  const handleCapturedScan = useCallback((elements: CapturedElement[]) => {
-    const getElementType = (tagName: string): ScannedElement['type'] => {
-      const tag = tagName.toLowerCase();
-      if (tag === 'button') return 'button';
-      if (tag === 'a') return 'link';
-      if (tag === 'input') return 'input';
-      if (tag === 'select') return 'select';
-      if (tag === 'textarea') return 'input';
-      if (tag === 'nav') return 'navigation';
-      return 'other';
-    };
-
-    const scanned: ScannedElement[] = elements.map(el => ({
-      type: getElementType(el.tagName),
-      selector: el.selector,
-      label: el.label,
-      tagName: el.tagName,
-      rect: el.rect,
-    }));
-    setScannedElements(scanned);
-    setIsScanning(false);
-    
-    toast({
-      title: 'Elementos escaneados',
-      description: `${elements.length} elementos encontrados.`,
-    });
-  }, [toast]);
 
   // Handler for complete step captured from console script
   const handleCapturedStep = useCallback(async (stepData: {
@@ -311,8 +282,7 @@ export default function VisualTourBuilder() {
         });
       } else if (event.data.type === 'TOUR_CAPTURE_ELEMENT') {
         handleCapturedElement(event.data.element as CapturedElement);
-      } else if (event.data.type === 'TOUR_CAPTURE_SCAN') {
-        handleCapturedScan(event.data.elements as CapturedElement[]);
+      } else if (event.data.type === 'TOUR_CAPTURE_STEP') {
       } else if (event.data.type === 'TOUR_CAPTURE_STEP') {
         // Complete step from console script - save directly
         handleCapturedStep(event.data.step);
@@ -338,7 +308,7 @@ export default function VisualTourBuilder() {
       window.removeEventListener('message', handleMessage);
       channel?.close();
     };
-  }, [captureToken, toast, handleCapturedElement, handleCapturedScan, handleCapturedStep]);
+  }, [captureToken, toast, handleCapturedElement, handleCapturedStep]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -379,38 +349,11 @@ export default function VisualTourBuilder() {
     setSidebarTab('steps');
   }, []);
 
-  const handleScannedElementClick = useCallback((element: ScannedElement) => {
-    const selectedElement: SelectedElement = {
-      tagName: element.tagName,
-      id: null,
-      classList: [],
-      textContent: element.label,
-      selector: element.selector,
-      rect: element.rect,
-    };
-    setState(prev => ({
-      ...prev,
-      selectedElement,
-      isSelectionMode: false,
-    }));
-    setShowConfigPanel(true);
-    setSidebarTab('steps');
-  }, []);
 
   const handleIframeReady = useCallback(() => {
     setIframeReady(true);
   }, []);
 
-  const handleElementsScanned = useCallback((elements: ScannedElement[]) => {
-    setScannedElements(elements);
-    setIsScanning(false);
-    if (elements.length > 0) {
-      toast({
-        title: 'Elementos detectados',
-        description: `${elements.length} elementos interativos encontrados na página.`,
-      });
-    }
-  }, [toast]);
 
   const handleStartCapture = useCallback(() => {
     const token = crypto.randomUUID();
@@ -419,10 +362,6 @@ export default function VisualTourBuilder() {
     setShowCaptureModal(true);
   }, []);
 
-  const handleScanElements = useCallback(() => {
-    // In direct mode, open capture modal for scanning
-    handleStartCapture();
-  }, [handleStartCapture]);
 
   const handleSaveStep = async (stepData: Omit<TourStep, 'id' | 'order'>) => {
     if (!id) return;
@@ -907,7 +846,7 @@ export default function VisualTourBuilder() {
             previewStepIndex={state.previewStepIndex}
             totalSteps={state.steps.length}
             onPreviewAction={handlePreviewAction}
-            onElementsScanned={handleElementsScanned}
+            
           />
         </main>
 
