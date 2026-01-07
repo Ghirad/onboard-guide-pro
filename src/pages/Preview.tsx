@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useConfiguration, useConfigurationSteps, useStepActions } from "@/hooks/useConfigurations";
 import { Loader2, ArrowLeft, Play, X, ChevronLeft, ChevronRight, Check, SkipForward } from "lucide-react";
-import { SetupStep } from "@/types/database";
+import { SetupStep, StepAction } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { TopBarWidget } from "@/components/widget/TopBarWidget";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Preview() {
   const { id } = useParams<{ id: string }>();
@@ -20,8 +22,37 @@ export default function Preview() {
   const { data: config, isLoading: configLoading } = useConfiguration(id);
   const { data: steps = [], isLoading: stepsLoading } = useConfigurationSteps(id);
 
+  // Fetch all actions for all steps
+  const { data: allActions = {} } = useQuery({
+    queryKey: ['all-step-actions', id, steps],
+    queryFn: async () => {
+      if (!steps.length) return {};
+      
+      const stepIds = steps.map(s => s.id);
+      const { data, error } = await supabase
+        .from('step_actions')
+        .select('*')
+        .in('step_id', stepIds)
+        .order('action_order', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Group actions by step_id
+      const grouped: Record<string, StepAction[]> = {};
+      data.forEach(action => {
+        if (!grouped[action.step_id]) {
+          grouped[action.step_id] = [];
+        }
+        grouped[action.step_id].push(action);
+      });
+      
+      return grouped;
+    },
+    enabled: steps.length > 0
+  });
+
   const currentStep = steps[currentStepIndex];
-  const { data: actions = [] } = useStepActions(currentStep?.id);
+  const currentActions = currentStep ? (allActions[currentStep.id] || []) : [];
 
   const progress = steps.length > 0 
     ? Math.round(((completedSteps.size + skippedSteps.size) / steps.length) * 100) 
@@ -43,6 +74,27 @@ export default function Preview() {
         setCurrentStepIndex(currentStepIndex + 1);
       }
     }
+  };
+
+  const handleRestart = () => {
+    setCompletedSteps(new Set());
+    setSkippedSteps(new Set());
+    setCurrentStepIndex(0);
+  };
+
+  const handleRestartFrom = (stepIndex: number) => {
+    // Remove completed/skipped status from this step onwards
+    const newCompleted = new Set(completedSteps);
+    const newSkipped = new Set(skippedSteps);
+    
+    for (let i = stepIndex; i < steps.length; i++) {
+      newCompleted.delete(steps[i].id);
+      newSkipped.delete(steps[i].id);
+    }
+    
+    setCompletedSteps(newCompleted);
+    setSkippedSteps(newSkipped);
+    setCurrentStepIndex(stepIndex);
   };
 
   const getStepStatus = (step: SetupStep) => {
@@ -107,11 +159,14 @@ export default function Preview() {
               currentStepIndex={currentStepIndex}
               completedSteps={completedSteps}
               skippedSteps={skippedSteps}
-              actions={actions}
+              actions={currentActions}
+              allActions={allActions}
               onStepChange={setCurrentStepIndex}
               onComplete={handleCompleteStep}
               onSkip={handleSkipStep}
               onClose={() => setIsWidgetOpen(false)}
+              onRestart={handleRestart}
+              onRestartFrom={handleRestartFrom}
             />
           )}
 
@@ -275,14 +330,14 @@ export default function Preview() {
                       </div>
                     )}
 
-                    {actions.length > 0 && (
+                    {currentActions.length > 0 && (
                       <Card>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm">Ações Automatizadas</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="space-y-2">
-                            {actions.map((action, index) => (
+                            {currentActions.map((action, index) => (
                               <li key={action.id} className="flex items-center gap-2 text-sm">
                                 <span className="flex h-5 w-5 items-center justify-center rounded bg-muted text-xs">
                                   {index + 1}
