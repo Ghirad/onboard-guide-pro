@@ -341,14 +341,26 @@ export function StepConfigPanel({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="buttonText">Texto do Botão</Label>
-                  <Input
-                    id="buttonText"
-                    value={config.buttonText || 'Próximo'}
-                    onChange={(e) => updateConfig('buttonText', e.target.value)}
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="showNextButton">Mostrar Botão "Próximo"</Label>
+                  <Switch
+                    id="showNextButton"
+                    checked={config.showNextButton ?? true}
+                    onCheckedChange={(checked) => updateConfig('showNextButton', checked)}
                   />
                 </div>
+
+                {(config.showNextButton ?? true) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="buttonText">Texto do Botão</Label>
+                    <Input
+                      id="buttonText"
+                      value={config.buttonText || 'Próximo'}
+                      onChange={(e) => updateConfig('buttonText', e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="showSkip">Mostrar Botão "Pular"</Label>

@@ -822,6 +822,8 @@ const widgetScript = `
           ? 'background:' + stepTheme.primaryColor + '; color: white;'
           : '';
         
+        var showNextBtn = step.show_next_button !== false;
+        
         tooltip.innerHTML = 
           '<div class="autosetup-tooltip-arrow arrow-' + position.arrowPosition + '"></div>' +
           (step.image_url ? '<img src="' + step.image_url + '" class="autosetup-tooltip-image" alt=""/>' : '') +
@@ -832,7 +834,7 @@ const widgetScript = `
           '<div class="autosetup-tooltip-desc">' + self._escapeHtml(step.description || '') + '</div>' +
           '<div class="autosetup-tooltip-actions">' +
             (!step.is_required ? '<button class="autosetup-btn autosetup-btn-modal-secondary" onclick="AutoSetup.skipStep()">Pular</button>' : '') +
-            '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' +
+            (showNextBtn ? '<button class="autosetup-btn autosetup-btn-modal-primary" style="' + buttonStyle + '" onclick="AutoSetup.completeStep()">' + buttonText + '</button>' : '') +
           '</div>';
         
         tooltip.style.cssText += position.style;

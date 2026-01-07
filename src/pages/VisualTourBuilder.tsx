@@ -128,6 +128,7 @@ export default function VisualTourBuilder() {
             highlightAnimation: firstAction?.highlight_animation || undefined,
             themeOverride,
             showSkip: !step.is_required,
+            showNextButton: (step as any).show_next_button ?? true,
           },
         };
       });
@@ -436,6 +437,7 @@ export default function VisualTourBuilder() {
           is_required: stepData.config.showSkip !== true,
           theme_override: stepData.config.themeOverride?.enabled ? stepData.config.themeOverride : null,
           tooltip_position: stepData.config.position || 'auto',
+          show_next_button: stepData.config.showNextButton !== false,
         } as any,
       });
       
@@ -485,6 +487,7 @@ export default function VisualTourBuilder() {
         theme_override: updates.config?.themeOverride?.enabled ? updates.config.themeOverride : null,
         tooltip_position: updates.config?.position || 'auto',
         is_required: updates.config?.showSkip !== true,
+        show_next_button: updates.config?.showNextButton !== false,
       } as any);
 
       // Also update associated action if type requires it

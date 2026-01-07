@@ -122,6 +122,7 @@ export type Database = {
           image_url: string | null
           instructions: string | null
           is_required: boolean
+          show_next_button: boolean
           step_order: number
           target_selector: string | null
           target_type: Database["public"]["Enums"]["step_target_type"]
@@ -140,6 +141,7 @@ export type Database = {
           image_url?: string | null
           instructions?: string | null
           is_required?: boolean
+          show_next_button?: boolean
           step_order: number
           target_selector?: string | null
           target_type?: Database["public"]["Enums"]["step_target_type"]
@@ -158,6 +160,7 @@ export type Database = {
           image_url?: string | null
           instructions?: string | null
           is_required?: boolean
+          show_next_button?: boolean
           step_order?: number
           target_selector?: string | null
           target_type?: Database["public"]["Enums"]["step_target_type"]
