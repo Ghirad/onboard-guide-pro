@@ -129,6 +129,7 @@ export type Database = {
           theme_override: Json | null
           tips: string | null
           title: string
+          tooltip_position: string | null
           updated_at: string
         }
         Insert: {
@@ -146,6 +147,7 @@ export type Database = {
           theme_override?: Json | null
           tips?: string | null
           title: string
+          tooltip_position?: string | null
           updated_at?: string
         }
         Update: {
@@ -163,6 +165,7 @@ export type Database = {
           theme_override?: Json | null
           tips?: string | null
           title?: string
+          tooltip_position?: string | null
           updated_at?: string
         }
         Relationships: [
