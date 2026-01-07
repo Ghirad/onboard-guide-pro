@@ -474,13 +474,6 @@ const widgetScript = `
         },
         cache: 'no-store'
       })
-      
-      return fetch(url, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        cache: 'no-store'
-      })
       .then(function(response) {
         if (!response.ok) throw new Error('Failed to fetch configuration');
         return response.json();
