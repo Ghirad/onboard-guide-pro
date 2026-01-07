@@ -18,7 +18,7 @@ import { CodeModal } from '@/components/visual-builder/CodeModal';
 // StepPreviewModal removed - preview now happens directly in iframe
 import { SelectedElement, TourStep, VisualBuilderState } from '@/types/visualBuilder';
 import { useConfiguration, useConfigurationStepsWithActions, useCreateStep, useUpdateStep, useDeleteStep, useCreateAction, useUpdateAction, useUpdateConfiguration, SetupStepWithActions } from '@/hooks/useConfigurations';
-import { useConfigurationBranches, useCreateBranch } from '@/hooks/useBranches';
+import { useConfigurationBranches, useCreateBranch, useUpdateBranch, useDeleteBranch } from '@/hooks/useBranches';
 import { TourStepType } from '@/types/visualBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -599,8 +599,10 @@ export default function VisualTourBuilder() {
     navigate(`/config/${id}`);
   };
 
-  // Branch creation from flowchart
+  // Branch management from flowchart
   const createBranch = useCreateBranch();
+  const updateBranch = useUpdateBranch();
+  const deleteBranch = useDeleteBranch();
   
   const handleBranchCreate = useCallback(async (sourceId: string, targetId: string) => {
     if (!id) return;
@@ -630,7 +632,7 @@ export default function VisualTourBuilder() {
       
       toast({
         title: 'Ramificação criada',
-        description: 'Configure a condição no painel lateral.',
+        description: 'Clique na conexão para configurar a condição.',
       });
     } catch (error) {
       console.error('[VisualTourBuilder] Error creating branch:', error);
@@ -641,6 +643,39 @@ export default function VisualTourBuilder() {
       });
     }
   }, [id, state.steps, branchesMap, updateStep, createBranch, refetchSteps, toast]);
+
+  const handleUpdateBranch = useCallback((branchId: string, updates: Partial<any>) => {
+    const stepId = Object.keys(branchesMap).find(sid => 
+      branchesMap[sid]?.some(b => b.id === branchId)
+    );
+    if (!stepId) return;
+    
+    updateBranch.mutate({ id: branchId, stepId, ...updates });
+  }, [branchesMap, updateBranch]);
+
+  const handleDeleteBranch = useCallback((branchId: string, stepId: string) => {
+    deleteBranch.mutate({ id: branchId, stepId });
+    
+    // Check if this was the last branch
+    const remainingBranches = (branchesMap[stepId] || []).filter(b => b.id !== branchId);
+    if (remainingBranches.length === 0) {
+      // Mark step as no longer a branch point
+      updateStep.mutate({
+        id: stepId,
+        configurationId: id!,
+        is_branch_point: false,
+      });
+    }
+  }, [branchesMap, deleteBranch, updateStep, id]);
+
+  const handleClearDefaultNext = useCallback((stepId: string) => {
+    if (!id) return;
+    updateStep.mutate({
+      id: stepId,
+      configurationId: id,
+      default_next_step_id: null,
+    });
+  }, [id, updateStep]);
 
   // Preview mode handlers
   const handleStartPreview = useCallback((startIndex = 0) => {
@@ -849,6 +884,9 @@ export default function VisualTourBuilder() {
                     updateStep.mutate({ id: sourceId, configurationId: id!, default_next_step_id: targetId });
                   }}
                   onBranchCreate={handleBranchCreate}
+                  onUpdateBranch={handleUpdateBranch}
+                  onDeleteBranch={handleDeleteBranch}
+                  onClearDefaultNext={handleClearDefaultNext}
                 />
               </TabsContent>
               <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto m-0">
@@ -899,10 +937,6 @@ export default function VisualTourBuilder() {
                   currentEditingStepId: null,
                 }));
               }}
-              stepId={state.currentEditingStepId || undefined}
-              allSteps={state.steps}
-              configurationId={id}
-              onUpdateStepBranchPoint={handleUpdateStepBranchPoint}
             />
           </aside>
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -18,6 +18,7 @@ import { TourStep } from '@/types/visualBuilder';
 import { StepBranch } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { MousePointer, Type, Clock, Sparkles, ArrowRight, GitBranch, MessageSquare } from 'lucide-react';
+import { EdgeEditPopover } from './EdgeEditPopover';
 
 interface FlowchartViewProps {
   steps: TourStep[];
@@ -26,6 +27,9 @@ interface FlowchartViewProps {
   onStepPositionChange: (stepId: string, x: number, y: number) => void;
   onConnectionCreate: (sourceId: string, targetId: string) => void;
   onBranchCreate?: (sourceId: string, targetId: string) => void;
+  onUpdateBranch?: (branchId: string, updates: Partial<StepBranch>) => void;
+  onDeleteBranch?: (branchId: string, stepId: string) => void;
+  onClearDefaultNext?: (stepId: string) => void;
 }
 
 // Custom node component for steps
@@ -123,6 +127,15 @@ const nodeTypes = {
   endNode: EndNode,
 };
 
+interface SelectedEdge {
+  id: string;
+  type: 'branch' | 'default' | 'linear';
+  branch?: StepBranch;
+  sourceId: string;
+  targetId: string;
+  position: { x: number; y: number };
+}
+
 export function FlowchartView({
   steps,
   branches,
@@ -130,7 +143,12 @@ export function FlowchartView({
   onStepPositionChange,
   onConnectionCreate,
   onBranchCreate,
+  onUpdateBranch,
+  onDeleteBranch,
+  onClearDefaultNext,
 }: FlowchartViewProps) {
+  const [selectedEdge, setSelectedEdge] = useState<SelectedEdge | null>(null);
+
   // Convert steps to ReactFlow nodes
   const initialNodes = useMemo(() => {
     const nodes: Node[] = [];
@@ -217,7 +235,7 @@ export function FlowchartView({
       
       if (stepBranches.length > 0) {
         // Step has branches - create edge for each branch
-        stepBranches.forEach((branch, branchIndex) => {
+        stepBranches.forEach((branch) => {
           if (branch.next_step_id) {
             edges.push({
               id: `branch-${step.id}-${branch.id}`,
@@ -227,8 +245,9 @@ export function FlowchartView({
               label: branch.condition_label,
               labelBgStyle: { fill: '#fef3c7', stroke: '#f59e0b' },
               labelStyle: { fontSize: 10, fontWeight: 500 },
-              style: { stroke: '#f59e0b', strokeWidth: 2 },
+              style: { stroke: '#f59e0b', strokeWidth: 2, cursor: 'pointer' },
               markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
+              data: { edgeType: 'branch', branch, stepId: step.id },
             });
           }
         });
@@ -243,8 +262,9 @@ export function FlowchartView({
             label: 'Padrão',
             labelBgStyle: { fill: '#e5e7eb' },
             labelStyle: { fontSize: 10 },
-            style: { stroke: '#6b7280', strokeWidth: 2, strokeDasharray: '5,5' },
+            style: { stroke: '#6b7280', strokeWidth: 2, strokeDasharray: '5,5', cursor: 'pointer' },
             markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
+            data: { edgeType: 'default', stepId: step.id },
           });
         }
       } else {
@@ -257,8 +277,9 @@ export function FlowchartView({
           source: step.id,
           target: targetId,
           type: 'smoothstep',
-          style: { stroke: '#6366f1', strokeWidth: 2 },
+          style: { stroke: '#6366f1', strokeWidth: 2, cursor: 'pointer' },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+          data: { edgeType: 'linear', stepId: step.id },
         });
       }
     });
@@ -308,8 +329,72 @@ export function FlowchartView({
     [onConnectionCreate, onBranchCreate, setEdges, branches, steps]
   );
 
+  // Handle edge click
+  const onEdgeClick = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      // Ignore start/end edges
+      if (edge.source === 'start' || edge.target === 'end') return;
+
+      const edgeData = edge.data || {};
+      let edgeType: 'branch' | 'default' | 'linear' = 'linear';
+      let branch: StepBranch | undefined;
+
+      if (edge.id.startsWith('branch-')) {
+        edgeType = 'branch';
+        branch = edgeData.branch;
+      } else if (edge.id.startsWith('default-')) {
+        edgeType = 'default';
+      }
+
+      setSelectedEdge({
+        id: edge.id,
+        type: edgeType,
+        branch,
+        sourceId: edge.source!,
+        targetId: edge.target!,
+        position: { x: event.clientX, y: event.clientY },
+      });
+    },
+    []
+  );
+
+  // Handle branch update from popover
+  const handleUpdateBranch = useCallback(
+    (branchId: string, updates: Partial<StepBranch>) => {
+      onUpdateBranch?.(branchId, updates);
+      setSelectedEdge(null);
+    },
+    [onUpdateBranch]
+  );
+
+  // Handle branch delete from popover
+  const handleDeleteBranch = useCallback(
+    (branchId: string, stepId: string) => {
+      onDeleteBranch?.(branchId, stepId);
+      setSelectedEdge(null);
+    },
+    [onDeleteBranch]
+  );
+
+  // Handle clear default next
+  const handleClearDefaultNext = useCallback(
+    (stepId: string) => {
+      onClearDefaultNext?.(stepId);
+      setSelectedEdge(null);
+    },
+    [onClearDefaultNext]
+  );
+
+  // Handle convert branch to default
+  const handleConvertToDefault = useCallback(
+    (stepId: string, targetId: string) => {
+      onConnectionCreate(stepId, targetId);
+    },
+    [onConnectionCreate]
+  );
+
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -317,6 +402,7 @@ export function FlowchartView({
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
+        onEdgeClick={onEdgeClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -327,6 +413,29 @@ export function FlowchartView({
         <Controls className="!bg-card !border !shadow-sm" />
         <Background gap={20} size={1} color="hsl(var(--muted-foreground) / 0.1)" />
       </ReactFlow>
+
+      {/* Edge Edit Popover */}
+      {selectedEdge && (
+        <EdgeEditPopover
+          open={!!selectedEdge}
+          onOpenChange={(open) => !open && setSelectedEdge(null)}
+          position={selectedEdge.position}
+          edgeType={selectedEdge.type}
+          branch={selectedEdge.branch}
+          sourceStepId={selectedEdge.sourceId}
+          targetStepId={selectedEdge.targetId}
+          allSteps={steps}
+          onUpdateBranch={handleUpdateBranch}
+          onDeleteBranch={handleDeleteBranch}
+          onClearDefaultNext={handleClearDefaultNext}
+          onConvertToDefault={handleConvertToDefault}
+        />
+      )}
+
+      {/* Help hint */}
+      <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur px-3 py-2 rounded-lg border shadow-sm text-xs text-muted-foreground">
+        <span className="font-medium">Dica:</span> Arraste entre nós para criar conexões • Clique em uma conexão para editar
+      </div>
     </div>
   );
 }
