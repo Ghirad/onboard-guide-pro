@@ -654,8 +654,33 @@ export default function VisualTourBuilder() {
     }
   }, [state.steps, handleStartPreview]);
 
-  // Use direct URL (no proxy)
-  const iframeUrl = configuration?.target_url || '';
+  // Calculate preview URL with allowed_routes path
+  const getPreviewUrl = () => {
+    if (!configuration?.target_url) return '';
+    
+    const allowedRoutes = configuration.allowed_routes;
+    if (!allowedRoutes || allowedRoutes.length === 0) {
+      return configuration.target_url;
+    }
+    
+    // Get first allowed route, strip wildcard if present
+    let routePath = allowedRoutes[0];
+    if (routePath.endsWith('/*')) {
+      routePath = routePath.slice(0, -2); // Remove /*
+    }
+    
+    // Combine base URL with route path
+    try {
+      const baseUrl = new URL(configuration.target_url);
+      baseUrl.pathname = routePath;
+      console.log('[VisualBuilder] Preview URL:', baseUrl.href);
+      return baseUrl.href;
+    } catch {
+      return configuration.target_url + routePath;
+    }
+  };
+  
+  const iframeUrl = getPreviewUrl();
   const builderOrigin = window.location.origin;
 
   if (configLoading || stepsLoading) {
@@ -812,7 +837,7 @@ export default function VisualTourBuilder() {
         <CaptureModal
           open={showCaptureModal}
           onOpenChange={setShowCaptureModal}
-          targetUrl={configuration.target_url}
+          targetUrl={iframeUrl || configuration.target_url}
           captureToken={captureToken}
           builderOrigin={builderOrigin}
           configurationId={id!}

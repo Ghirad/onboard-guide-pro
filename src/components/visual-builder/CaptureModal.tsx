@@ -151,6 +151,7 @@ export function CaptureModal({
   };
 
   const handleOpenSiteWithOpener = () => {
+    // Use targetUrl which should already include the allowed route path
     window.open(targetUrl, '_blank', 'noopener=no');
     toast({
       title: 'Portal aberto',
