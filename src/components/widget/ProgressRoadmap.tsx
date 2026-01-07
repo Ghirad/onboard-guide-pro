@@ -15,13 +15,18 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
-  Play
+  Play,
+  Lock,
+  GitBranch
 } from "lucide-react";
 import { SetupStep, StepAction } from "@/types/database";
+import { VisibleStep } from "@/hooks/useVisibleSteps";
 import { cn } from "@/lib/utils";
 
 interface ProgressRoadmapProps {
   steps: SetupStep[];
+  visibleSteps?: VisibleStep[];
+  hasLockedSteps?: boolean;
   currentStepIndex: number;
   completedSteps: Set<string>;
   skippedSteps: Set<string>;
@@ -52,6 +57,8 @@ const actionTypeLabels: Record<string, string> = {
 
 export function ProgressRoadmap({
   steps,
+  visibleSteps,
+  hasLockedSteps = false,
   currentStepIndex,
   completedSteps,
   skippedSteps,
@@ -61,6 +68,8 @@ export function ProgressRoadmap({
   onRestart,
   onRestartFrom,
 }: ProgressRoadmapProps) {
+  // Use visible steps if provided, otherwise fall back to all steps
+  const displaySteps = visibleSteps || steps.map(s => ({ ...s, isLocked: false, depth: 0 } as VisibleStep));
   const [showRestartOptions, setShowRestartOptions] = useState(false);
 
   const getStepStatus = (step: SetupStep) => {
@@ -136,11 +145,12 @@ export function ProgressRoadmap({
       {/* Steps List */}
       <ScrollArea className="max-h-[50vh]">
         <div className="p-4 space-y-1">
-          {steps.map((step, index) => {
+          {displaySteps.map((step, index) => {
             const status = getStepStatus(step);
             const stepActions = getStepActions(step.id);
             const actionsSummary = summarizeActions(stepActions);
-            const isLast = index === steps.length - 1;
+            const isLast = index === displaySteps.length - 1 && !hasLockedSteps;
+            const originalIndex = steps.findIndex(s => s.id === step.id);
 
             return (
               <div key={step.id} className="relative">
@@ -159,6 +169,7 @@ export function ProgressRoadmap({
                 <div
                   className={cn(
                     "relative flex gap-3 p-3 rounded-lg transition-colors",
+                    step.depth > 0 && "ml-4 border-l-2 border-primary/20",
                     status === "current" && "bg-primary/10 border-l-2 border-primary",
                     status === "completed" && "opacity-80",
                     status === "pending" && "opacity-60 hover:opacity-80",
@@ -177,7 +188,7 @@ export function ProgressRoadmap({
                       </div>
                     ) : status === "current" ? (
                       <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center ring-2 ring-primary/30 ring-offset-2">
-                        <span className="text-xs font-bold text-primary-foreground">{index + 1}</span>
+                        <span className="text-xs font-bold text-primary-foreground">{originalIndex + 1}</span>
                       </div>
                     ) : (
                       <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
@@ -188,11 +199,23 @@ export function ProgressRoadmap({
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm truncate">{step.title}</span>
                       {!step.is_required && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                           Opcional
+                        </Badge>
+                      )}
+                      {step.branchPath && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                          <GitBranch className="h-2.5 w-2.5" />
+                          {step.branchPath}
+                        </Badge>
+                      )}
+                      {step.hasLockedBranches && !step.branchPath && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                          <GitBranch className="h-2.5 w-2.5" />
+                          Escolha aqui
                         </Badge>
                       )}
                     </div>
@@ -225,7 +248,7 @@ export function ProgressRoadmap({
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => onRestartFrom(index)}
+                        onClick={() => onRestartFrom(originalIndex)}
                       >
                         <RotateCcw className="h-3 w-3 mr-1" />
                         Refazer
@@ -236,7 +259,7 @@ export function ProgressRoadmap({
                         variant="default"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => onStepChange(index)}
+                        onClick={() => onStepChange(originalIndex)}
                       >
                         <Play className="h-3 w-3 mr-1" />
                         Continuar
@@ -258,7 +281,7 @@ export function ProgressRoadmap({
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={() => onRestartFrom(index)}
+                        onClick={() => onRestartFrom(originalIndex)}
                       >
                         <RotateCcw className="h-3 w-3 mr-1" />
                         Refazer
@@ -269,13 +292,43 @@ export function ProgressRoadmap({
               </div>
             );
           })}
+
+          {/* Locked Steps Indicator */}
+          {hasLockedSteps && (
+            <div className="relative">
+              <div 
+                className="absolute left-[15px] top-0 w-0.5 h-4 bg-muted-foreground/20"
+              />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30 ml-0">
+                <div className="flex-shrink-0">
+                  <div className="h-7 w-7 rounded-full bg-muted-foreground/20 flex items-center justify-center">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Mais passos disponíveis
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    Complete os passos anteriores para desbloquear novos caminhos
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
 
       {/* Footer */}
       <div className="p-3 border-t bg-muted/20 text-center">
-        <p className="text-xs text-muted-foreground">
-          {completedSteps.size} de {steps.length} passos concluídos
+        <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+          {completedSteps.size} de {displaySteps.length} passos concluídos
+          {hasLockedSteps && (
+            <span className="flex items-center gap-0.5 text-muted-foreground/70">
+              <Lock className="h-3 w-3" />
+              +?
+            </span>
+          )}
         </p>
       </div>
     </div>

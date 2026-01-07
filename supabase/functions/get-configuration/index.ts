@@ -75,10 +75,12 @@ Deno.serve(async (req) => {
 
     // Fetch saved progress if clientId is provided
     let savedProgress: Record<string, { status: string; completed_at?: string; skipped_at?: string }> = {};
+    let branchChoices: Record<string, string> = {};
     
     if (clientId) {
       console.log('[get-configuration] Fetching progress for clientId:', clientId);
       
+      // Fetch user progress
       const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
         .select('step_id, status, completed_at, skipped_at')
@@ -100,9 +102,26 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      // Fetch branch choices
+      const { data: choicesData, error: choicesError } = await supabase
+        .from('user_branch_choices')
+        .select('step_id, branch_id')
+        .eq('client_id', clientId)
+        .eq('configuration_id', configId);
+
+      if (choicesError) {
+        console.error('[get-configuration] Branch choices fetch error:', choicesError);
+      } else if (choicesData && choicesData.length > 0) {
+        console.log('[get-configuration] Found branch choices:', choicesData.length);
+        
+        for (const choice of choicesData) {
+          branchChoices[choice.step_id] = choice.branch_id;
+        }
+      }
     }
 
-    // Return configuration, steps, and saved progress
+    // Return configuration, steps, saved progress, and branch choices
     const response = {
       configuration: {
         id: config.id,
@@ -126,7 +145,8 @@ Deno.serve(async (req) => {
         actionTypeStyles: config.action_type_styles || {}
       },
       steps: stepsWithSortedData,
-      progress: savedProgress
+      progress: savedProgress,
+      branchChoices: branchChoices
     };
 
     console.log(`[get-configuration] Returned config ${configId} with ${steps?.length || 0} steps and ${Object.keys(savedProgress).length} progress entries`);

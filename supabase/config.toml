@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.save-progress]
 verify_jwt = false
+
+[functions.save-branch-choice]
+verify_jwt = false
